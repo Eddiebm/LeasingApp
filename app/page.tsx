@@ -19,10 +19,38 @@ export default function HomePage() {
         </Link>
 
         <Link
+          href="/report"
+          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-slate-900 text-base font-medium"
+        >
+          Report a problem (tenants)
+        </Link>
+
+        <Link
           href="/dashboard"
           className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-slate-900 text-base font-medium"
         >
           Landlord Dashboard
+        </Link>
+
+        <Link
+          href="/portal"
+          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-slate-900 text-base font-medium"
+        >
+          Tenant Portal
+        </Link>
+
+        <Link
+          href="/pay"
+          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-slate-900 text-base font-medium"
+        >
+          Pay (rent, fees)
+        </Link>
+
+        <Link
+          href="/privacy"
+          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-slate-600 text-sm"
+        >
+          Privacy &amp; data
         </Link>
       </div>
     </main>

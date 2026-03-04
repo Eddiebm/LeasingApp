@@ -1,9 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { supabase } from "../../../lib/supabaseClient";
+import { getDashboardUser } from "../../../lib/apiAuth";
+
+export const runtime = "edge";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "GET") {
-    const { data: applications, error } = await supabase
+    const auth = await getDashboardUser(req);
+    if (!auth) return res.status(401).json({ error: "Unauthorized" });
+    const propertyId = typeof req.query.propertyId === "string" ? req.query.propertyId : undefined;
+    let q = supabase
       .from("applications")
       .select(`
         id,
@@ -16,6 +22,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         properties ( id, address, city, state, zip, rent )
       `)
       .order("created_at", { ascending: false });
+    if (propertyId) q = q.eq("property_id", propertyId);
+    const { data: applications, error } = await q;
 
     if (error) {
       console.error(error);
@@ -104,6 +112,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .eq("id", appRow.id);
   } catch (e) {
     console.error("Screening follow-up error", e);
+  }
+
+  try {
+    const { sendApplicationReceived } = await import("../../../lib/email");
+    await sendApplicationReceived(data.email, appRow.id);
+  } catch (e) {
+    console.error("Application email error", e);
   }
 
   return res.status(200).json({ success: true, applicationId: appRow.id });

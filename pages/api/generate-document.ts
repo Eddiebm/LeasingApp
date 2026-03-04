@@ -1,11 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { generateLease } from "../../lib/generateLease";
 import { supabaseServer } from "../../lib/supabaseServer";
+import { getDashboardUser } from "../../lib/apiAuth";
+
+export const runtime = "edge";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") {
-    return res.status(405).end();
-  }
+  if (req.method !== "POST") return res.status(405).end();
+  const auth = await getDashboardUser(req);
+  if (!auth) return res.status(401).json({ error: "Unauthorized" });
 
   const data = req.body;
 
@@ -35,6 +38,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           type: "lease",
           file_url: urlData.publicUrl
         });
+        const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+        await supabaseServer.from("applications").update({ lease_sign_token: token }).eq("id", applicationId);
+        res.setHeader("X-Lease-Sign-Token", token);
       }
     } catch (e) {
       console.error("Document storage error", e);

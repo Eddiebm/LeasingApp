@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseServer } from "../../../lib/supabaseServer";
 
+export const runtime = "edge";
+
 const ALLOWED_TYPES = ["tenant_id", "paystub", "bank_statement", "other"] as const;
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
 

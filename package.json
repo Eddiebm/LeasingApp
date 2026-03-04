@@ -7,6 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "build:cloudflare": "next build && npx @cloudflare/next-on-pages",
+    "deploy": "npm run build:cloudflare && npx wrangler pages deploy --project-name=leasingapp",
     "start": "next start",
     "preview": "npx wrangler pages dev .vercel/output/static --compatibility-flags=nodejs_compat",
     "lint": "next lint"
@@ -16,7 +17,9 @@
     "next": "14.2.18",
     "pdf-lib": "^1.17.1",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "resend": "^4.0.0",
+    "stripe": "^17.0.0"
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.9.0",

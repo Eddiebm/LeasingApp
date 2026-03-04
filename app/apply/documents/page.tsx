@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useState, useCallback } from "react";
+import { useState, useCallback, Suspense } from "react";
 import Link from "next/link";
 
 const DOC_TYPES = [
@@ -11,7 +11,7 @@ const DOC_TYPES = [
   { value: "other", label: "Other document" }
 ] as const;
 
-export default function ApplyDocumentsPage() {
+function ApplyDocumentsContent() {
   const searchParams = useSearchParams();
   const applicationId = searchParams.get("applicationId") ?? "";
 
@@ -153,5 +153,13 @@ export default function ApplyDocumentsPage() {
         <Link href="/" className="underline">Back to home</Link>
       </p>
     </main>
+  );
+}
+
+export default function ApplyDocumentsPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-slate-600">Loading…</div>}>
+      <ApplyDocumentsContent />
+    </Suspense>
   );
 }

@@ -8,14 +8,14 @@ Rental agency platform for **Bannerman Group**: tenants submit applications, upl
 - **Landlord dashboard:** List applications, view screening results (credit score, income), approve/reject, view uploaded documents, generate and store lease PDFs.
 - **Documents:** Tenant uploads stored in Supabase Storage and linked to applications; generated leases saved to Storage and `documents` table.
 - **PWA:** Installable on mobile; manifest and service worker included.
-- **Deploy:** Ready for Vercel or Cloudflare Pages.
+- **Deploy:** Cloudflare Pages (via `@cloudflare/next-on-pages`).
 
 ## Stack
 
 - **Frontend:** Next.js 14 (App Router), Tailwind CSS
 - **Backend / DB / Storage:** Supabase (Postgres, Storage)
 - **PDFs:** pdf-lib
-- **Hosting:** Vercel or Cloudflare Pages
+- **Hosting:** Cloudflare Pages
 
 ## Setup
 
@@ -28,13 +28,13 @@ npm install
 ### 2. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. In the SQL editor, run `database/schema.sql`, then `database/seed.sql`.
+2. Run schema and migrations in order: see **[database/README.md](./database/README.md)** (schema → seed → `001_maintenance_and_audit.sql` → `002_payments_lease_esign.sql`).
 3. In **Storage**, create a **public** bucket named `documents` (tenant uploads and generated lease PDFs).
-4. Copy env vars into `.env.local` (see `.env.example`).
+4. Copy env vars into `.env.local` (see `.env.example` and **ENV.md**).
 
 ### 3. Environment
 
-Create `.env.local`:
+See **[ENV.md](./ENV.md)** for all variables and where to set them (local, GitHub, Cloudflare). Create `.env.local` with at least:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
@@ -66,16 +66,36 @@ npm run dev
 
 ## Deploy (Cloudflare Pages)
 
-1. Push to GitHub and connect the repo in Cloudflare Dashboard → Pages.
-2. Build command: `npm run build` (or `npm run build:cloudflare` with `@cloudflare/next-on-pages`).
-3. Set env vars in the Pages project.
-4. Add custom domain (e.g. `leasing.bannermangroup.com`).
+### Deploy checklist (do in order)
 
-## Deploy (Vercel)
+1. **GitHub Secrets** (repo → Settings → Secrets and variables → Actions):  
+   `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.  
+   Optional: `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `DASHBOARD_STAFF_EMAILS` (see [ENV.md](./ENV.md)).
+2. **Push to `main`** – the GitHub Action builds and deploys.
+3. **Cloudflare** → your Pages project → **Settings** → **Functions** → **Compatibility flags**: add **`nodejs_compat`** for **Production** and **Preview** and save. (Required or the app errors at runtime.)
+4. **Cloudflare env vars** (optional for Actions): if you use Option B or want overrides, set the same vars under Pages → **Settings** → **Environment variables**.
 
-1. Import the GitHub repo in Vercel.
-2. Add environment variables.
-3. Deploy; optional custom domain.
+**Stripe webhook:** The route `POST /api/webhooks/stripe` uses a raw request body and Node. On Cloudflare Pages (Edge), it may not work. To receive `payment_intent.succeeded` and mark payments paid, either (a) use a separate Node endpoint (e.g. Vercel serverless) and point Stripe to that URL, or (b) run the webhook on a host that supports `bodyParser: false` and set `STRIPE_WEBHOOK_SECRET` there.
+
+### Option A: GitHub Actions (recommended)
+
+On push to `main`, the workflow builds and deploys. No Cloudflare build command needed.
+
+1. **GitHub** → repo **Settings** → **Secrets and variables** → **Actions** → **New repository secret**. Add:
+   - `CLOUDFLARE_API_TOKEN` – [Create Token](https://dash.cloudflare.com/profile/api-tokens) with “Cloudflare Pages Edit”.
+   - `CLOUDFLARE_ACCOUNT_ID` – from Cloudflare Dashboard (URL or sidebar).
+   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` – same as `.env.local`.
+2. Push to `main`; the **Actions** tab runs the deploy.
+3. In **Cloudflare** → Pages project → **Settings** → **Functions** → add **nodejs_compat** for Production and Preview.
+
+### Option B: Cloudflare Git build
+
+1. Push to GitHub and connect the repo in **Cloudflare Dashboard** → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**.
+2. **Build command:** `npm run build:cloudflare`
+3. **Build output directory:** `.vercel/output/static` (output format from `@cloudflare/next-on-pages`; deployment is Cloudflare only).
+4. **Node.js compatibility (required):** In the Cloudflare dashboard, go to your Pages project → **Settings** → **Functions**. In the **Compatibility flags** section, for both the **Production** and **Preview** environments, type **`nodejs_compat`** in the input box and click **Save**. (Without this, the app will show a “no nodejs_compat compatibility flag set” error.)
+5. Set env vars in the Pages project (**Settings** → **Environment variables**).
+6. Add custom domain (e.g. `leasing.bannermangroup.com`) under **Custom domains**.
 
 ## Screening
 
@@ -88,6 +108,12 @@ Screening is mocked in `lib/runScreening.ts`. To use **Checkr** or **RentPrep**:
 
 - **Tenant uploads:** `tenant_id`, `paystub`, `bank_statement`, `other` (via `/apply/documents`).
 - **Generated:** `lease` (via dashboard “Generate Lease”); optional LOI, move-in checklist, rent receipt can be added in `lib/` and API routes.
+
+## Docs
+
+- **[ENV.md](./ENV.md)** – Environment variables and where to set them.
+- **[database/README.md](./database/README.md)** – Schema, migrations, and storage bucket.
+- **[TESTING.md](./TESTING.md)** – Step-by-step testing checklist for apply, dashboard, portal, sign-lease, pay, and maintenance.
 
 ## License
 
