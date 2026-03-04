@@ -1,0 +1,13 @@
+{
+  "name": "leasingapp",
+  "version": "1.0.0",
+  "description": "End-to-end rental agency management platform",
+  "private": true,
+  "scripts": {
+    "start:server": "cd server && npm start",
+    "start:client": "cd client && npm start",
+    "install:all": "cd server && npm install && cd ../client && npm install",
+    "test:server": "cd server && npm test",
+    "test:client": "cd client && npm test -- --watchAll=false"
+  }
+}
