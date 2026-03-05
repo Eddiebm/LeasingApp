@@ -7,11 +7,11 @@ export async function getDashboardUser(req: { headers: { authorization?: string 
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   if (!token) return null;
 
-  // Use service role key for server-side token validation — available at runtime on Cloudflare edge
   const supabaseUrl =
     process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.SUPABASE_URL ||
     "";
+
   const supabaseServiceKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SECRET_KEY ||
