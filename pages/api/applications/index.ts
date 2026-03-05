@@ -58,13 +58,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const data = req.body;
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("SUPABASE_SERVICE_ROLE_KEY not set – add it in Cloudflare env vars");
+    return res.status(503).json({ error: "Server misconfigured. Please try again later." });
+  }
   const required = ["firstName", "lastName", "phone", "email", "dob"];
   for (const key of required) {
     if (!data[key] || String(data[key]).trim() === "") {
       return res.status(400).json({ error: `Missing required field: ${key}` });
     }
   }
-  const db = supabaseServer ?? supabase;
+  const db = supabaseServer;
 
   const { data: tenantRow, error: tenantError } = await db
     .from("tenants")

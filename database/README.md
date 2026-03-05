@@ -2,10 +2,13 @@
 
 ## Order of operations
 
-1. Run **schema** and **seed** first (creates tables and optional seed data).
-2. Run **migrations** in order: `001_maintenance_and_audit.sql`, then `002_payments_lease_esign.sql`.
-
-In Supabase: **SQL Editor** → New query → paste and run each file in that order.
+1. Run **schema** and **seed** first (creates tables and optional seed data) in Supabase SQL Editor.
+2. Run **migrations** either:
+   - **From your machine:** Add `DATABASE_URL` to `.env.local` (Supabase → Settings → Database → Connection string → URI), then run:
+     ```bash
+     npm run db:migrate
+     ```
+   - **In Supabase:** SQL Editor → New query → paste and run `migrations/001_maintenance_and_audit.sql`, then `migrations/002_payments_lease_esign.sql`.
 
 ## Files
 
