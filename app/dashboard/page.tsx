@@ -34,7 +34,7 @@ type MaintenanceRequest = {
 
 export default function Dashboard() {
   const router = useRouter();
-  const [session, setSession] = useState<{ access_token: string } | null>(null);
+  const [session, setSession] = useState<{ access_token: string; user?: { email?: string } } | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyId, setPropertyId] = useState<string>("");
   const [applications, setApplications] = useState<Application[]>([]);
