@@ -1,13 +1,12 @@
 import { generateLease } from "../../lib/generateLease";
-import { getSupabaseServer } from "../../lib/supabaseServer";
-import { getDashboardUser } from "../../lib/apiAuth";
+import { getDashboardUser, getAdminClient } from "../../lib/apiAuth";
 
 export const runtime = "edge";
 
 export default async function handler(req: Request) {
   if (req.method !== "POST") return new Response(null, { status: 405 });
 
-  const auth = await getDashboardUser(req as unknown as { headers: { authorization?: string } });
+  const auth = await getDashboardUser(req);
   if (!auth) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
 
   let data: Record<string, unknown> = {};
@@ -32,19 +31,19 @@ export default async function handler(req: Request) {
     try {
       const bucket = "documents";
       const fileName = `lease-${applicationId}-${Date.now()}.pdf`;
-      const { error: uploadError } = await getSupabaseServer().storage
+      const { error: uploadError } = await getAdminClient().storage
         .from(bucket)
         .upload(fileName, pdfBytes, { contentType: "application/pdf", upsert: true });
 
       if (!uploadError) {
-        const { data: urlData } = getSupabaseServer().storage.from(bucket).getPublicUrl(fileName);
-        await getSupabaseServer().from("documents").insert({
+        const { data: urlData } = getAdminClient().storage.from(bucket).getPublicUrl(fileName);
+        await getAdminClient().from("documents").insert({
           application_id: applicationId,
           type: "lease",
           file_url: urlData.publicUrl
         });
         const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-        await getSupabaseServer().from("applications").update({ lease_sign_token: token }).eq("id", applicationId);
+        await getAdminClient().from("applications").update({ lease_sign_token: token }).eq("id", applicationId);
         responseHeaders["X-Lease-Sign-Token"] = token;
       }
     } catch (e) {

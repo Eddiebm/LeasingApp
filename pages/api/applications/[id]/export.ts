@@ -1,5 +1,4 @@
-import { getDashboardUser } from "../../../../lib/apiAuth";
-import { getSupabaseServer } from "../../../../lib/supabaseServer";
+import { getDashboardUser, getAdminClient } from "../../../../lib/apiAuth";
 
 export const runtime = "edge";
 
@@ -13,7 +12,7 @@ function json(data: unknown, status = 200) {
 export default async function handler(req: Request) {
   if (req.method !== "GET") return new Response(null, { status: 405 });
 
-  const auth = await getDashboardUser(req as unknown as { headers: { authorization?: string } });
+  const auth = await getDashboardUser(req);
   if (!auth) return json({ error: "Unauthorized" }, 401);
 
   const url = new URL(req.url);
@@ -21,7 +20,7 @@ export default async function handler(req: Request) {
   const id = parts[parts.length - 2] ?? "";
   if (!id) return json({ error: "Missing application id" }, 400);
 
-  const { data: app, error: appError } = await getSupabaseServer()
+  const { data: app, error: appError } = await getAdminClient()
     .from("applications")
     .select(`
       id,
@@ -42,13 +41,13 @@ export default async function handler(req: Request) {
 
   if (appError || !app) return json({ error: "Application not found" }, 404);
 
-  const { data: history } = await getSupabaseServer()
+  const { data: history } = await getAdminClient()
     .from("application_status_history")
     .select("from_status, to_status, changed_at, changed_by")
     .eq("application_id", id)
     .order("changed_at", { ascending: true });
 
-  const { data: docs } = await getSupabaseServer()
+  const { data: docs } = await getAdminClient()
     .from("documents")
     .select("type, file_url, created_at")
     .eq("application_id", id)

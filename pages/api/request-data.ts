@@ -1,4 +1,4 @@
-import { getSupabaseServer } from "../../lib/supabaseServer";
+import { getAdminClient } from "../../lib/apiAuth";
 
 export const runtime = "edge";
 
@@ -17,7 +17,7 @@ export default async function handler(req: Request) {
   const email = typeof body?.email === "string" ? body.email.trim() : "";
   if (!email) return json({ error: "Email required." }, 400);
 
-  const { data: tenant } = await getSupabaseServer()
+  const { data: tenant } = await getAdminClient()
     .from("tenants")
     .select("id, first_name, last_name, email, phone, dob, created_at")
     .eq("email", email.toLowerCase())
@@ -27,12 +27,12 @@ export default async function handler(req: Request) {
     return json({ message: "If an account exists for this email, we will process your request." });
   }
 
-  const { data: applications } = await getSupabaseServer()
+  const { data: applications } = await getAdminClient()
     .from("applications")
     .select("id, status, created_at")
     .eq("tenant_id", (tenant as { id: string }).id);
 
-  const { data: documents } = await getSupabaseServer()
+  const { data: documents } = await getAdminClient()
     .from("documents")
     .select("type, file_url, created_at")
     .in("application_id", (applications ?? []).map((a: { id: string }) => a.id));

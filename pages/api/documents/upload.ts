@@ -1,4 +1,4 @@
-import { getSupabaseServer } from "../../../lib/supabaseServer";
+import { getAdminClient } from "../../../lib/apiAuth";
 
 export const runtime = "edge";
 
@@ -51,7 +51,7 @@ export default async function handler(req: Request) {
   const safeName = `${type}-${applicationId}-${Date.now()}.${ext}`;
   const bucket = "Documents";
 
-  const { error: uploadError } = await getSupabaseServer().storage
+  const { error: uploadError } = await getAdminClient().storage
     .from(bucket)
     .upload(safeName, bytes, { contentType: fileType || "application/octet-stream", upsert: true });
 
@@ -60,9 +60,9 @@ export default async function handler(req: Request) {
     return json({ error: uploadError.message }, 500);
   }
 
-  const { data: urlData } = getSupabaseServer().storage.from(bucket).getPublicUrl(safeName);
+  const { data: urlData } = getAdminClient().storage.from(bucket).getPublicUrl(safeName);
 
-  const { error: insertError } = await getSupabaseServer().from("documents").insert({
+  const { error: insertError } = await getAdminClient().from("documents").insert({
     application_id: applicationId,
     type,
     file_url: urlData.publicUrl

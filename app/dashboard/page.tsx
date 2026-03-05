@@ -34,7 +34,9 @@ type MaintenanceRequest = {
 
 export default function Dashboard() {
   const router = useRouter();
-  const [session, setSession] = useState<{ access_token: string; user?: { email?: string } } | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | undefined>(undefined);
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyId, setPropertyId] = useState<string>("");
   const [applications, setApplications] = useState<Application[]>([]);
@@ -42,14 +44,23 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [maintenanceLoading, setMaintenanceLoading] = useState(true);
 
+  // Step 1: Load session first, redirect to login if none
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => setSession(s ?? null));
-  }, []);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.replace("/dashboard/login");
+        return;
+      }
+      setAccessToken(session.access_token);
+      setUserEmail(session.user?.email ?? undefined);
+      setSessionReady(true);
+    });
+  }, [router]);
 
   const getAuthHeaders = useCallback((): HeadersInit => {
-    if (!session?.access_token) return {};
-    return { Authorization: `Bearer ${session.access_token}` };
-  }, [session?.access_token]);
+    if (!accessToken) return {};
+    return { Authorization: `Bearer ${accessToken}` };
+  }, [accessToken]);
 
   const fetchProperties = useCallback(async () => {
     try {
@@ -67,57 +78,66 @@ export default function Dashboard() {
     try {
       const url = propertyId ? `/api/applications?propertyId=${encodeURIComponent(propertyId)}` : "/api/applications";
       const res = await fetch(url, { headers: getAuthHeaders() });
-      if (res.status === 401) {
-        router.replace("/dashboard/login");
-        return;
-      }
       if (res.ok) {
         const data = await res.json();
         setApplications(Array.isArray(data) ? data : []);
+      } else {
+        console.warn("Applications fetch failed:", res.status);
+        setApplications([]);
       }
     } catch (e) {
       console.error(e);
+      setApplications([]);
     } finally {
       setLoading(false);
     }
-  }, [getAuthHeaders, propertyId, router]);
+  }, [getAuthHeaders, propertyId]);
 
   const fetchMaintenance = useCallback(async () => {
     try {
       const url = propertyId ? `/api/maintenance?propertyId=${encodeURIComponent(propertyId)}` : "/api/maintenance";
       const res = await fetch(url, { headers: getAuthHeaders() });
-      if (res.status === 401) {
-        router.replace("/dashboard/login");
-        return;
-      }
       if (res.ok) {
         const data = await res.json();
         setMaintenance(Array.isArray(data) ? data : []);
+      } else {
+        console.warn("Maintenance fetch failed:", res.status);
+        setMaintenance([]);
       }
     } catch (e) {
       console.error(e);
+      setMaintenance([]);
     } finally {
       setMaintenanceLoading(false);
     }
-  }, [getAuthHeaders, propertyId, router]);
+  }, [getAuthHeaders, propertyId]);
 
+  // Step 2: Only fetch data after session is confirmed
   useEffect(() => {
-    if (!session) return;
+    if (!sessionReady) return;
     fetchProperties();
-  }, [session, fetchProperties]);
+  }, [sessionReady, fetchProperties]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!sessionReady) return;
     setLoading(true);
     setMaintenanceLoading(true);
     fetchApplications();
     fetchMaintenance();
-  }, [session, propertyId, fetchApplications, fetchMaintenance]);
+  }, [sessionReady, propertyId, fetchApplications, fetchMaintenance]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.replace("/dashboard/login");
   };
+
+  if (!sessionReady) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <p className="text-sm text-slate-500">Loading dashboard…</p>
+      </div>
+    );
+  }
 
   return (
     <main className="space-y-6">
@@ -170,7 +190,7 @@ export default function Dashboard() {
                 application={app}
                 onRefresh={fetchApplications}
                 getAuthHeaders={getAuthHeaders}
-                userEmail={session?.user?.email ?? undefined}
+                userEmail={userEmail}
               />
             ))}
           </div>

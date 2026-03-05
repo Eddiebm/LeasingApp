@@ -1,8 +1,14 @@
-import { supabase } from "../../../lib/supabaseClient";
-import { getSupabaseServer } from "../../../lib/supabaseServer";
-import { getDashboardUser } from "../../../lib/apiAuth";
+import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "edge";
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://seedtvpyhmzskkdlnblg.supabase.co";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
+  "sb_publishable_KUY0YWTlIfqPW20phruqiw_B75TXglU";
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SECRET_KEY ||
+  "";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -15,11 +21,29 @@ export default async function handler(req: Request) {
   const url = new URL(req.url);
 
   if (req.method === "GET") {
-    const auth = await getDashboardUser(req as unknown as { headers: { authorization?: string } });
-    if (!auth) return json({ error: "Unauthorized" }, 401);
+    // Use the user's own token to query — Supabase validates it automatically
+    const authHeader = req.headers.get("authorization") ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!token) return json({ error: "Unauthorized" }, 401);
+
+    // Create a client scoped to the user's token
+    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // Verify the token is valid by getting the user
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    if (authError || !user) return json({ error: "Unauthorized" }, 401);
 
     const propertyId = url.searchParams.get("propertyId") ?? undefined;
-    let q = supabase
+    
+    // Use service key client for the actual data query (bypasses RLS for admin dashboard)
+    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+    
+    let q = adminClient
       .from("applications")
       .select(`
         id,
@@ -66,12 +90,6 @@ export default async function handler(req: Request) {
     return new Response(null, { status: 405 });
   }
 
-  // Guard: SUPABASE_SERVICE_ROLE_KEY must be set for server-side writes
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error("SUPABASE_SERVICE_ROLE_KEY not set – add it in Cloudflare env vars");
-    return json({ error: "Server misconfigured. Please try again later." }, 503);
-  }
-
   let data: Record<string, unknown>;
   try {
     data = await req.json();
@@ -87,10 +105,12 @@ export default async function handler(req: Request) {
     }
   }
 
-  const db = getSupabaseServer();
+  const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false }
+  });
 
   // Insert tenant record
-  const { data: tenantRow, error: tenantError } = await db
+  const { data: tenantRow, error: tenantError } = await adminClient
     .from("tenants")
     .insert({
       first_name: data.firstName,
@@ -112,8 +132,7 @@ export default async function handler(req: Request) {
     ? parseFloat(String(data.monthlyIncome).replace(/[^0-9.]/g, ""))
     : null;
 
-  // Insert application record — includes all form fields from migration 001
-  const { data: appRow, error: appError } = await db
+  const { data: appRow, error: appError } = await adminClient
     .from("applications")
     .insert({
       property_id: data.propertyId || null,
@@ -140,7 +159,7 @@ export default async function handler(req: Request) {
 
   const appId = (appRow as { id: string }).id;
 
-  // Run background/credit screening (non-blocking; errors do not fail the submission)
+  // Run background/credit screening (non-blocking)
   try {
     const { runScreening } = await import("../../../lib/runScreening");
     const screenData = await runScreening({
@@ -148,7 +167,7 @@ export default async function handler(req: Request) {
       lastName: data.lastName as string,
       dob: data.dob as string
     });
-    await db
+    await adminClient
       .from("applications")
       .update({
         credit_score: screenData.credit_score ?? null,
@@ -159,7 +178,7 @@ export default async function handler(req: Request) {
     console.error("Screening follow-up error", e);
   }
 
-  // Send confirmation email (non-blocking; errors do not fail the submission)
+  // Send confirmation email (non-blocking)
   try {
     const { sendApplicationReceived } = await import("../../../lib/email");
     await sendApplicationReceived(data.email as string, appId);

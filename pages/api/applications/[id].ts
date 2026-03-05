@@ -16,7 +16,7 @@ export default async function handler(req: Request) {
   if (!id) return json({ error: "Missing application id" }, 400);
 
   if (req.method === "PATCH") {
-    const auth = await getDashboardUser(req as unknown as { headers: { authorization?: string } });
+    const auth = await getDashboardUser(req);
     if (!auth) return json({ error: "Unauthorized" }, 401);
 
     let body: Record<string, unknown> = {};

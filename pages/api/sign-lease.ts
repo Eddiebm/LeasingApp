@@ -1,5 +1,5 @@
+import { getAdminClient } from "../../lib/apiAuth";
 import { PDFDocument } from "pdf-lib";
-import { getSupabaseServer } from "../../lib/supabaseServer";
 
 export const runtime = "edge";
 
@@ -17,7 +17,7 @@ export default async function handler(req: Request) {
     const token = url.searchParams.get("token")?.trim() ?? "";
     if (!token) return json({ error: "Missing token" }, 400);
 
-    const { data: app, error } = await getSupabaseServer()
+    const { data: app, error } = await getAdminClient()
       .from("applications")
       .select("id, lease_signed_at, lease_signed_pdf_url, tenants ( first_name, last_name ), properties ( address, city, state, zip )")
       .eq("lease_sign_token", token)
@@ -50,7 +50,7 @@ export default async function handler(req: Request) {
     return json({ error: "Missing token or signature" }, 400);
   }
 
-  const { data: app, error: appError } = await getSupabaseServer()
+  const { data: app, error: appError } = await getAdminClient()
     .from("applications")
     .select("id, lease_sign_token")
     .eq("lease_sign_token", token)
@@ -61,7 +61,7 @@ export default async function handler(req: Request) {
   }
 
   const applicationId = (app as { id: string }).id;
-  const { data: doc } = await getSupabaseServer()
+  const { data: doc } = await getAdminClient()
     .from("documents")
     .select("file_url")
     .eq("application_id", applicationId)
@@ -96,15 +96,15 @@ export default async function handler(req: Request) {
 
     const bucket = "documents";
     const signedPath = `lease-signed-${applicationId}-${Date.now()}.pdf`;
-    const { error: uploadErr } = await getSupabaseServer().storage
+    const { error: uploadErr } = await getAdminClient().storage
       .from(bucket)
       .upload(signedPath, signedPdfBytes, { contentType: "application/pdf", upsert: true });
 
     if (uploadErr) throw uploadErr;
-    const { data: urlData } = getSupabaseServer().storage.from(bucket).getPublicUrl(signedPath);
+    const { data: urlData } = getAdminClient().storage.from(bucket).getPublicUrl(signedPath);
     const signedPdfUrl = urlData.publicUrl;
 
-    await getSupabaseServer()
+    await getAdminClient()
       .from("applications")
       .update({
         lease_signed_at: new Date().toISOString(),

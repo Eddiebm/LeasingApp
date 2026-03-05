@@ -1,35 +1,42 @@
+import { createClient } from "@supabase/supabase-js";
+
 export type AuthResult = { user: { id: string; email: string }; email: string } | null;
 
-export async function getDashboardUser(req: { headers: { authorization?: string } }): Promise<AuthResult> {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://seedtvpyhmzskkdlnblg.supabase.co";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
+  "sb_publishable_KUY0YWTlIfqPW20phruqiw_B75TXglU";
+
+/**
+ * Extracts the Bearer token from a request, supporting both:
+ * - Web Request API (edge runtime): req.headers.get("authorization")
+ * - Old-style NextApiRequest: req.headers.authorization
+ */
+function extractToken(req: Request | { headers: { authorization?: string } }): string | null {
+  let authHeader: string | null | undefined;
+  if (typeof (req.headers as Headers).get === "function") {
+    // Web Request API (edge runtime)
+    authHeader = (req.headers as Headers).get("authorization");
+  } else {
+    // Old-style NextApiRequest
+    authHeader = (req.headers as { authorization?: string }).authorization;
+  }
+  if (!authHeader) return null;
+  return authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+}
+
+export async function getDashboardUser(req: Request | { headers: { authorization?: string } }): Promise<AuthResult> {
+  const token = extractToken(req);
   if (!token) return null;
 
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    process.env.SUPABASE_URL ||
-    "https://seedtvpyhmzskkdlnblg.supabase.co";
-
-  const supabaseServiceKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SECRET_KEY ||
-    "";
-
-  if (!supabaseUrl || !supabaseServiceKey) return null;
-
-  // Use direct fetch instead of Supabase JS client to avoid edge runtime issues.
-  // The sb_secret key works as both apikey and Bearer token for the admin endpoint.
-  const resp = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: {
-      "apikey": supabaseServiceKey,
-      "Authorization": `Bearer ${token}`,
-    },
+  // Create a Supabase client scoped to the user's token
+  const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { autoRefreshToken: false, persistSession: false }
   });
 
-  if (!resp.ok) return null;
-
-  const user = await resp.json() as { id?: string; email?: string };
-  if (!user?.email || !user?.id) return null;
+  const { data: { user }, error } = await client.auth.getUser();
+  if (error || !user?.email || !user?.id) return null;
 
   const staffList = process.env.DASHBOARD_STAFF_EMAILS;
   if (staffList) {
@@ -37,5 +44,14 @@ export async function getDashboardUser(req: { headers: { authorization?: string 
     if (!allowed.includes(user.email.toLowerCase())) return null;
   }
 
-  return { user: { id: user.id!, email: user.email! }, email: user.email! };
+  return { user: { id: user.id, email: user.email }, email: user.email };
+}
+
+export function getAdminClient() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+    "";
+  return createClient(SUPABASE_URL, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false }
+  });
 }

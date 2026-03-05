@@ -16,7 +16,7 @@ export default async function handler(req: Request) {
   const url = new URL(req.url);
   const forDashboard = url.searchParams.get("for") === "dashboard";
   if (forDashboard) {
-    const auth = await getDashboardUser(req as unknown as { headers: { authorization?: string } });
+    const auth = await getDashboardUser(req);
     if (!auth) return json({ error: "Unauthorized" }, 401);
   }
 
