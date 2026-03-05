@@ -1,5 +1,5 @@
 import { supabase } from "../../../lib/supabaseClient";
-import { getSupabaseServer } from "../../../lib/getSupabaseServer()";
+import { getSupabaseServer } from "../../../lib/supabaseServer";
 import { getDashboardUser } from "../../../lib/apiAuth";
 
 export const runtime = "edge";

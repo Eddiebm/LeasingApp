@@ -1,5 +1,5 @@
 import { PDFDocument } from "pdf-lib";
-import { getSupabaseServer } from "../../lib/getSupabaseServer()";
+import { getSupabaseServer } from "../../lib/supabaseServer";
 
 export const runtime = "edge";
 

@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { getSupabaseServer } from "../../../lib/getSupabaseServer()";
+import { getSupabaseServer } from "../../../lib/supabaseServer";
 
 export const runtime = "edge";
 
