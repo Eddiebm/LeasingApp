@@ -83,25 +83,26 @@ export default async function handler(req: Request) {
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* empty body */ }
 
-  const { applicationId, email, category, description, photoUrl } = body;
-  if (!applicationId || !email || !category || !CATEGORIES.includes(category as typeof CATEGORIES[number])) {
-    return json({ error: "applicationId, email, and valid category required" }, 400);
+  const { email, category, description, photoUrl } = body;
+  if (!email || !category || !CATEGORIES.includes(category as typeof CATEGORIES[number])) {
+    return json({ error: "email and valid category required" }, 400);
   }
 
+  // Look up the most recent application by tenant email
   const { data: application, error: appError } = await supabaseServer
     .from("applications")
     .select("id, tenants ( email )")
-    .eq("id", applicationId)
-    .single();
+    .eq("tenants.email", String(email).trim().toLowerCase())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   if (appError || !application) {
-    return json({ error: "Application not found" }, 404);
+    return json({ error: "No application found for this email address" }, 404);
   }
 
+  const applicationId = (application as { id: string }).id;
   const tenantEmail = (application as { tenants: { email: string } | null }).tenants?.email;
-  if ((tenantEmail ?? "").toLowerCase() !== String(email).trim().toLowerCase()) {
-    return json({ error: "Email does not match this application" }, 403);
-  }
 
   const { data: row, error } = await supabaseServer
     .from("maintenance_requests")

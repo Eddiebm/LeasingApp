@@ -13,7 +13,6 @@ const CATEGORIES = [
 ];
 
 export default function ReportPage() {
-  const [applicationId, setApplicationId] = useState("");
   const [email, setEmail] = useState("");
   const [category, setCategory] = useState("other");
   const [description, setDescription] = useState("");
@@ -30,7 +29,6 @@ export default function ReportPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          applicationId: applicationId.trim(),
           email: email.trim(),
           category,
           description: description.trim()
@@ -52,7 +50,7 @@ export default function ReportPage() {
         <div className="rounded-2xl bg-emerald-50 p-6 text-center">
           <h1 className="text-xl font-bold text-emerald-800">Request submitted</h1>
           <p className="mt-2 text-slate-700">
-            We’ve received your maintenance request and will address it as soon as possible.
+            We've received your maintenance request and will address it as soon as possible.
           </p>
         </div>
         <Link href="/" className="block text-center text-sm underline text-slate-600">Back to home</Link>
@@ -64,31 +62,21 @@ export default function ReportPage() {
     <main className="space-y-6">
       <h1 className="text-2xl font-bold">Report a problem</h1>
       <p className="text-sm text-slate-600">
-        Tenants: enter your application ID and email, then describe the issue.
+        Enter the email address you used on your application, then describe the issue.
       </p>
       <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
         {error && (
           <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700" role="alert">{error}</p>
         )}
         <div>
-          <label htmlFor="applicationId" className="mb-1 block text-sm font-medium text-slate-700">Application ID</label>
-          <input
-            id="applicationId"
-            type="text"
-            required
-            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm min-h-[48px]"
-            placeholder="From your application confirmation"
-            value={applicationId}
-            onChange={(e) => setApplicationId(e.target.value)}
-          />
-        </div>
-        <div>
           <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">Email</label>
           <input
             id="email"
             type="email"
             required
+            autoComplete="email"
             className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm min-h-[48px]"
+            placeholder="The email you used on your application"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
