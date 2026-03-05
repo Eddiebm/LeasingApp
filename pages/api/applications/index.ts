@@ -1,15 +1,24 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { supabase } from "../../../lib/supabaseClient";
 import { supabaseServer } from "../../../lib/supabaseServer";
 import { getDashboardUser } from "../../../lib/apiAuth";
 
 export const runtime = "edge";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+
+export default async function handler(req: Request) {
+  const url = new URL(req.url);
+
   if (req.method === "GET") {
-    const auth = await getDashboardUser(req);
-    if (!auth) return res.status(401).json({ error: "Unauthorized" });
-    const propertyId = typeof req.query.propertyId === "string" ? req.query.propertyId : undefined;
+    const auth = await getDashboardUser(req as unknown as { headers: { authorization?: string } });
+    if (!auth) return json({ error: "Unauthorized" }, 401);
+
+    const propertyId = url.searchParams.get("propertyId") ?? undefined;
     let q = supabase
       .from("applications")
       .select(`
@@ -28,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (error) {
       console.error(error);
-      return res.status(500).json({ error: error.message });
+      return json({ error: error.message }, 500);
     }
 
     const list = (applications ?? []).map((a: Record<string, unknown>) => {
@@ -50,26 +59,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
     });
 
-    return res.status(200).json(list);
+    return json(list);
   }
 
   if (req.method !== "POST") {
-    return res.status(405).end();
+    return new Response(null, { status: 405 });
   }
-
-  const data = req.body;
 
   // Guard: SUPABASE_SERVICE_ROLE_KEY must be set for server-side writes
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.error("SUPABASE_SERVICE_ROLE_KEY not set – add it in Cloudflare env vars");
-    return res.status(503).json({ error: "Server misconfigured. Please try again later." });
+    return json({ error: "Server misconfigured. Please try again later." }, 503);
+  }
+
+  let data: Record<string, unknown>;
+  try {
+    data = await req.json();
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400);
   }
 
   // Validate required fields
   const required = ["firstName", "lastName", "phone", "email", "dob"];
   for (const key of required) {
     if (!data[key] || String(data[key]).trim() === "") {
-      return res.status(400).json({ error: `Missing required field: ${key}` });
+      return json({ error: `Missing required field: ${key}` }, 400);
     }
   }
 
@@ -91,7 +105,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (tenantError || !tenantRow) {
     console.error(tenantError);
-    return res.status(500).json({ error: tenantError?.message ?? "Failed to create tenant" });
+    return json({ error: tenantError?.message ?? "Failed to create tenant" }, 500);
   }
 
   const incomeNum = data.monthlyIncome
@@ -103,7 +117,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .from("applications")
     .insert({
       property_id: data.propertyId || null,
-      tenant_id: tenantRow.id,
+      tenant_id: (tenantRow as { id: string }).id,
       employment: data.employer ? `${data.employer} – ${data.position || ""}`.trim() : null,
       income: incomeNum,
       previous_landlord: data.previousLandlord || null,
@@ -121,16 +135,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (appError || !appRow) {
     console.error(appError);
-    return res.status(500).json({ error: appError?.message ?? "Failed to create application" });
+    return json({ error: appError?.message ?? "Failed to create application" }, 500);
   }
+
+  const appId = (appRow as { id: string }).id;
 
   // Run background/credit screening (non-blocking; errors do not fail the submission)
   try {
     const { runScreening } = await import("../../../lib/runScreening");
     const screenData = await runScreening({
-      firstName: data.firstName,
-      lastName: data.lastName,
-      dob: data.dob
+      firstName: data.firstName as string,
+      lastName: data.lastName as string,
+      dob: data.dob as string
     });
     await db
       .from("applications")
@@ -138,7 +154,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         credit_score: screenData.credit_score ?? null,
         background_result: { evictions: screenData.evictions, criminal_record: screenData.criminal_record }
       })
-      .eq("id", appRow.id);
+      .eq("id", appId);
   } catch (e) {
     console.error("Screening follow-up error", e);
   }
@@ -146,10 +162,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Send confirmation email (non-blocking; errors do not fail the submission)
   try {
     const { sendApplicationReceived } = await import("../../../lib/email");
-    await sendApplicationReceived(data.email, appRow.id);
+    await sendApplicationReceived(data.email as string, appId);
   } catch (e) {
     console.error("Application email error", e);
   }
 
-  return res.status(200).json({ success: true, applicationId: appRow.id });
+  return json({ success: true, applicationId: appId });
 }

@@ -1,13 +1,21 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { PDFDocument } from "pdf-lib";
 import { supabaseServer } from "../../lib/supabaseServer";
 
 export const runtime = "edge";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+
+export default async function handler(req: Request) {
+  const url = new URL(req.url);
+
   if (req.method === "GET") {
-    const token = (req.query.token as string)?.trim();
-    if (!token) return res.status(400).json({ error: "Missing token" });
+    const token = url.searchParams.get("token")?.trim() ?? "";
+    if (!token) return json({ error: "Missing token" }, 400);
 
     const { data: app, error } = await supabaseServer
       .from("applications")
@@ -15,9 +23,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .eq("lease_sign_token", token)
       .single();
 
-    if (error || !app) return res.status(404).json({ error: "Invalid or expired link" });
+    if (error || !app) return json({ error: "Invalid or expired link" }, 404);
     if ((app as { lease_signed_at: string | null }).lease_signed_at) {
-      return res.status(200).json({
+      return json({
         signed: true,
         signedPdfUrl: (app as { lease_signed_pdf_url: string | null }).lease_signed_pdf_url
       });
@@ -25,19 +33,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const tenant = (app as { tenants: { first_name: string; last_name: string } | null }).tenants;
     const prop = (app as { properties: { address: string; city: string; state: string; zip: string } | null }).properties;
-    return res.status(200).json({
+    return json({
       signed: false,
       tenantName: tenant ? `${tenant.first_name} ${tenant.last_name}`.trim() : "",
       propertyAddress: prop ? `${prop.address}, ${prop.city}, ${prop.state} ${prop.zip}` : ""
     });
   }
 
-  if (req.method !== "POST") return res.status(405).end();
+  if (req.method !== "POST") return new Response(null, { status: 405 });
 
-  const { token: bodyToken, signatureDataUrl } = req.body ?? {};
+  let body: Record<string, unknown> = {};
+  try { body = await req.json(); } catch { /* empty body */ }
+  const { token: bodyToken, signatureDataUrl } = body;
   const token = String(bodyToken ?? "").trim();
   if (!token || !signatureDataUrl || typeof signatureDataUrl !== "string") {
-    return res.status(400).json({ error: "Missing token or signature" });
+    return json({ error: "Missing token or signature" }, 400);
   }
 
   const { data: app, error: appError } = await supabaseServer
@@ -46,8 +56,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .eq("lease_sign_token", token)
     .single();
 
-  if (appError || !app || (app as { lease_sign_token: string }).lease_sign_token !== token) {
-    return res.status(404).json({ error: "Invalid or expired link" });
+    if (appError || !app || (app as { lease_sign_token: string }).lease_sign_token !== token) {
+    return json({ error: "Invalid or expired link" }, 404);
   }
 
   const applicationId = (app as { id: string }).id;
@@ -61,7 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .single();
 
   const leaseUrl = (doc as { file_url: string } | null)?.file_url;
-  if (!leaseUrl) return res.status(400).json({ error: "Lease document not found" });
+  if (!leaseUrl) return json({ error: "Lease document not found" }, 400);
 
   try {
     const [leaseRes, sigMatch] = await Promise.all([
@@ -70,7 +80,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ]);
     if (!leaseRes.ok) throw new Error("Could not fetch lease PDF");
     const leaseBytes = new Uint8Array(await leaseRes.arrayBuffer());
-    if (!sigMatch) return res.status(400).json({ error: "Invalid signature format" });
+    if (!sigMatch) return json({ error: "Invalid signature format" }, 400);
     const base64 = sigMatch[2];
     const sigBytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 
@@ -103,9 +113,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
       .eq("id", applicationId);
 
-    return res.status(200).json({ success: true, signedPdfUrl });
+    return json({ success: true, signedPdfUrl });
   } catch (e) {
     console.error("Sign lease error", e);
-    return res.status(500).json({ error: "Failed to save signature" });
+    return json({ error: "Failed to save signature" }, 500);
   }
 }

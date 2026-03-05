@@ -1,16 +1,25 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { getDashboardUser } from "../../../../lib/apiAuth";
 import { supabaseServer } from "../../../../lib/supabaseServer";
 
 export const runtime = "edge";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") return res.status(405).end();
-  const auth = await getDashboardUser(req);
-  if (!auth) return res.status(401).json({ error: "Unauthorized" });
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
 
-  const id = req.query.id as string;
-  if (!id) return res.status(400).json({ error: "Missing application id" });
+export default async function handler(req: Request) {
+  if (req.method !== "GET") return new Response(null, { status: 405 });
+
+  const auth = await getDashboardUser(req as unknown as { headers: { authorization?: string } });
+  if (!auth) return json({ error: "Unauthorized" }, 401);
+
+  const url = new URL(req.url);
+  const parts = url.pathname.split("/");
+  const id = parts[parts.length - 2] ?? "";
+  if (!id) return json({ error: "Missing application id" }, 400);
 
   const { data: app, error: appError } = await supabaseServer
     .from("applications")
@@ -31,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .eq("id", id)
     .single();
 
-  if (appError || !app) return res.status(404).json({ error: "Application not found" });
+  if (appError || !app) return json({ error: "Application not found" }, 404);
 
   const { data: history } = await supabaseServer
     .from("application_status_history")
@@ -57,7 +66,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }))
   };
 
-  res.setHeader("Content-Type", "application/json");
-  res.setHeader("Content-Disposition", `attachment; filename="application-${id}-export.json"`);
-  return res.status(200).send(JSON.stringify(exportData, null, 2));
+  return new Response(JSON.stringify(exportData, null, 2), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Disposition": `attachment; filename="application-${id}-export.json"`
+    }
+  });
 }

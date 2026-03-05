@@ -1,19 +1,29 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { supabase } from "../../../lib/supabaseClient";
 import { getDashboardUser } from "../../../lib/apiAuth";
 
 export const runtime = "edge";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const id = req.query.id as string;
-  if (!id) return res.status(400).json({ error: "Missing application id" });
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+
+export default async function handler(req: Request) {
+  const url = new URL(req.url);
+  const id = url.pathname.split("/").pop() ?? "";
+  if (!id) return json({ error: "Missing application id" }, 400);
 
   if (req.method === "PATCH") {
-    const auth = await getDashboardUser(req);
-    if (!auth) return res.status(401).json({ error: "Unauthorized" });
-    const { status, changedBy } = req.body ?? {};
-    if (!status || !["approved", "rejected", "pending"].includes(status)) {
-      return res.status(400).json({ error: "Invalid status" });
+    const auth = await getDashboardUser(req as unknown as { headers: { authorization?: string } });
+    if (!auth) return json({ error: "Unauthorized" }, 401);
+
+    let body: Record<string, unknown> = {};
+    try { body = await req.json(); } catch { /* empty body */ }
+    const { status, changedBy } = body;
+    if (!status || !["approved", "rejected", "pending"].includes(status as string)) {
+      return json({ error: "Invalid status" }, 400);
     }
 
     const { data: existing } = await supabase.from("applications").select("status").eq("id", id).single();
@@ -23,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (error) {
       console.error(error);
-      return res.status(500).json({ error: error.message });
+      return json({ error: error.message }, 500);
     }
 
     await supabase.from("application_status_history").insert({
@@ -33,8 +43,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       changed_by: changedBy ?? auth.email
     });
 
-    return res.status(200).json({ success: true });
+    return json({ success: true });
   }
 
-  return res.status(405).end();
+  return new Response(null, { status: 405 });
 }

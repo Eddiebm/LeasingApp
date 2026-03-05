@@ -1,27 +1,32 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { generateLease } from "../../lib/generateLease";
 import { supabaseServer } from "../../lib/supabaseServer";
 import { getDashboardUser } from "../../lib/apiAuth";
 
 export const runtime = "edge";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).end();
-  const auth = await getDashboardUser(req);
-  if (!auth) return res.status(401).json({ error: "Unauthorized" });
+export default async function handler(req: Request) {
+  if (req.method !== "POST") return new Response(null, { status: 405 });
 
-  const data = req.body;
+  const auth = await getDashboardUser(req as unknown as { headers: { authorization?: string } });
+  if (!auth) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
+
+  let data: Record<string, unknown> = {};
+  try { data = await req.json(); } catch { /* empty body */ }
 
   const pdfBytes = await generateLease({
-    tenant: data.tenant,
-    property: data.property,
+    tenant: data.tenant as string,
+    property: data.property as string,
     rent: Number(data.rent) || 0,
     deposit: Number(data.deposit) || 0,
-    moveIn: data.moveIn ?? "",
-    landlord: data.landlord ?? "Eddie Bannerman-Menson"
+    moveIn: (data.moveIn as string) ?? "",
+    landlord: (data.landlord as string) ?? "Eddie Bannerman-Menson"
   });
 
-  const applicationId = data.applicationId;
+  const applicationId = data.applicationId as string | undefined;
+  const responseHeaders: Record<string, string> = {
+    "Content-Type": "application/pdf",
+    "Content-Disposition": 'attachment; filename="lease.pdf"'
+  };
 
   if (applicationId && supabaseServer) {
     try {
@@ -40,14 +45,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
         const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 16);
         await supabaseServer.from("applications").update({ lease_sign_token: token }).eq("id", applicationId);
-        res.setHeader("X-Lease-Sign-Token", token);
+        responseHeaders["X-Lease-Sign-Token"] = token;
       }
     } catch (e) {
       console.error("Document storage error", e);
     }
   }
 
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", 'attachment; filename="lease.pdf"');
-  return res.send(Buffer.from(pdfBytes));
+  return new Response(pdfBytes, { status: 200, headers: responseHeaders });
 }

@@ -1,13 +1,21 @@
-import type { NextApiRequest, NextApiResponse } from "next";
-
 export const runtime = "edge";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).end();
-  const email = req.body?.email?.trim?.();
-  if (!email) return res.status(400).json({ error: "Email required." });
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
 
-  return res.status(200).json({
+export default async function handler(req: Request) {
+  if (req.method !== "POST") return new Response(null, { status: 405 });
+
+  let body: Record<string, unknown> = {};
+  try { body = await req.json(); } catch { /* empty body */ }
+  const email = typeof body?.email === "string" ? body.email.trim() : "";
+  if (!email) return json({ error: "Email required." }, 400);
+
+  return json({
     message: "Deletion request received. We will verify your identity and process your request; you will be contacted at the email you provided."
   });
 }

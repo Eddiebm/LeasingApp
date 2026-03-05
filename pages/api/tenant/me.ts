@@ -1,13 +1,20 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseServer } from "../../../lib/supabaseServer";
 
 export const runtime = "edge";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") return res.status(405).end();
-  const applicationId = (req.query.applicationId as string)?.trim();
-  const email = (req.query.email as string)?.trim()?.toLowerCase();
-  if (!applicationId || !email) return res.status(400).json({ error: "applicationId and email required" });
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+
+export default async function handler(req: Request) {
+  if (req.method !== "GET") return new Response(null, { status: 405 });
+  const url = new URL(req.url);
+  const applicationId = url.searchParams.get("applicationId")?.trim() ?? "";
+  const email = url.searchParams.get("email")?.trim()?.toLowerCase() ?? "";
+  if (!applicationId || !email) return json({ error: "applicationId and email required" }, 400);
 
   const { data: app, error: appError } = await supabaseServer
     .from("applications")
@@ -22,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .eq("id", applicationId)
     .single();
 
-  if (appError || !app) return res.status(404).json({ error: "Application not found" });
+  if (appError || !app) return json({ error: "Application not found" }, 404);
   const a = app as {
     id: string;
     status: string;
@@ -32,7 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     properties: { address: string; city: string; state: string; zip: string; rent: number } | null;
   };
   const tenantEmail = a.tenants?.email?.toLowerCase();
-  if (tenantEmail !== email) return res.status(403).json({ error: "Access denied" });
+  if (tenantEmail !== email) return json({ error: "Access denied" }, 403);
 
   const [docsRes, maintenanceRes, paymentsRes] = await Promise.all([
     supabaseServer.from("documents").select("type, file_url, created_at").eq("application_id", a.id).order("created_at", { ascending: false }),
@@ -40,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     supabaseServer.from("payments").select("id, amount_cents, status, paid_at, created_at").eq("application_id", a.id).order("created_at", { ascending: false })
   ]);
 
-  return res.status(200).json({
+  return json({
     applicationId: a.id,
     status: a.status,
     tenantName: a.tenants ? `${a.tenants.first_name} ${a.tenants.last_name}`.trim() : "",

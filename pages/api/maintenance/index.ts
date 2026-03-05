@@ -1,4 +1,3 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { supabase } from "../../../lib/supabaseClient";
 import { supabaseServer } from "../../../lib/supabaseServer";
 
@@ -6,12 +5,22 @@ export const runtime = "edge";
 
 const CATEGORIES = ["plumbing", "electrical", "hvac", "appliance", "pest", "other"] as const;
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+
+export default async function handler(req: Request) {
+  const url = new URL(req.url);
+
   if (req.method === "GET") {
     const { getDashboardUser } = await import("../../../lib/apiAuth");
-    const auth = await getDashboardUser(req);
-    if (!auth) return res.status(401).json({ error: "Unauthorized" });
-    const propertyId = typeof req.query.propertyId === "string" ? req.query.propertyId : undefined;
+    const auth = await getDashboardUser(req as unknown as { headers: { authorization?: string } });
+    if (!auth) return json({ error: "Unauthorized" }, 401);
+
+    const propertyId = url.searchParams.get("propertyId") ?? undefined;
     let q = supabase
       .from("maintenance_requests")
       .select(`
@@ -29,17 +38,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         )
       `)
       .order("created_at", { ascending: false });
+
     if (propertyId) {
       const { data: appIds } = await supabase.from("applications").select("id").eq("property_id", propertyId);
       const ids = (appIds ?? []).map((a: { id: string }) => a.id);
       if (ids.length) q = q.in("application_id", ids);
       else q = q.eq("application_id", "never-match");
     }
-    const { data, error } = await q;
 
+    const { data, error } = await q;
     if (error) {
       console.error(error);
-      return res.status(500).json({ error: error.message });
+      return json({ error: error.message }, 500);
     }
 
     const list = (data ?? []).map((r: Record<string, unknown>) => {
@@ -65,14 +75,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
     });
 
-    return res.status(200).json(list);
+    return json(list);
   }
 
-  if (req.method !== "POST") return res.status(405).end();
+  if (req.method !== "POST") return new Response(null, { status: 405 });
 
-  const { applicationId, email, category, description, photoUrl } = req.body ?? {};
-  if (!applicationId || !email || !category || !CATEGORIES.includes(category)) {
-    return res.status(400).json({ error: "applicationId, email, and valid category required" });
+  let body: Record<string, unknown> = {};
+  try { body = await req.json(); } catch { /* empty body */ }
+
+  const { applicationId, email, category, description, photoUrl } = body;
+  if (!applicationId || !email || !category || !CATEGORIES.includes(category as typeof CATEGORIES[number])) {
+    return json({ error: "applicationId, email, and valid category required" }, 400);
   }
 
   const { data: application, error: appError } = await supabaseServer
@@ -82,12 +95,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .single();
 
   if (appError || !application) {
-    return res.status(404).json({ error: "Application not found" });
+    return json({ error: "Application not found" }, 404);
   }
 
   const tenantEmail = (application as { tenants: { email: string } | null }).tenants?.email;
   if ((tenantEmail ?? "").toLowerCase() !== String(email).trim().toLowerCase()) {
-    return res.status(403).json({ error: "Email does not match this application" });
+    return json({ error: "Email does not match this application" }, 403);
   }
 
   const { data: row, error } = await supabaseServer
@@ -104,7 +117,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (error) {
     console.error(error);
-    return res.status(500).json({ error: error.message });
+    return json({ error: error.message }, 500);
   }
 
   try {
@@ -114,5 +127,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error("Maintenance email error", e);
   }
 
-  return res.status(201).json({ success: true, id: row.id, createdAt: row.created_at });
+  return json({ success: true, id: row.id, createdAt: row.created_at }, 201);
 }

@@ -1,17 +1,20 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { supabase } from "../../../lib/supabaseClient";
 
 export const runtime = "edge";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") {
-    return res.status(405).end();
-  }
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
 
-  const applicationId = req.query.applicationId as string;
-  if (!applicationId) {
-    return res.status(400).json({ error: "Missing applicationId" });
-  }
+export default async function handler(req: Request) {
+  if (req.method !== "GET") return new Response(null, { status: 405 });
+
+  const url = new URL(req.url);
+  const applicationId = url.searchParams.get("applicationId") ?? "";
+  if (!applicationId) return json({ error: "Missing applicationId" }, 400);
 
   const { data, error } = await supabase
     .from("documents")
@@ -21,8 +24,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (error) {
     console.error(error);
-    return res.status(500).json({ error: error.message });
+    return json({ error: error.message }, 500);
   }
 
-  return res.status(200).json(data ?? []);
+  return json(data ?? []);
 }
