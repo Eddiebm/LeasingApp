@@ -58,18 +58,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const data = req.body;
+
+  // Guard: SUPABASE_SERVICE_ROLE_KEY must be set for server-side writes
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.error("SUPABASE_SERVICE_ROLE_KEY not set – add it in Cloudflare env vars");
     return res.status(503).json({ error: "Server misconfigured. Please try again later." });
   }
+
+  // Validate required fields
   const required = ["firstName", "lastName", "phone", "email", "dob"];
   for (const key of required) {
     if (!data[key] || String(data[key]).trim() === "") {
       return res.status(400).json({ error: `Missing required field: ${key}` });
     }
   }
+
   const db = supabaseServer;
 
+  // Insert tenant record
   const { data: tenantRow, error: tenantError } = await db
     .from("tenants")
     .insert({
@@ -88,8 +94,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: tenantError?.message ?? "Failed to create tenant" });
   }
 
-  const incomeNum = data.monthlyIncome ? parseFloat(String(data.monthlyIncome).replace(/[^0-9.]/g, "")) : null;
+  const incomeNum = data.monthlyIncome
+    ? parseFloat(String(data.monthlyIncome).replace(/[^0-9.]/g, ""))
+    : null;
 
+  // Insert application record — includes all form fields from migration 001
   const { data: appRow, error: appError } = await db
     .from("applications")
     .insert({
@@ -98,6 +107,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       employment: data.employer ? `${data.employer} – ${data.position || ""}`.trim() : null,
       income: incomeNum,
       previous_landlord: data.previousLandlord || null,
+      current_address: data.currentAddress || null,
+      reason_for_leaving: data.reasonForLeaving || null,
+      monthly_rent: data.monthlyRent || null,
+      years_employed: data.yearsEmployed || null,
+      credit_consent: data.creditConsent === true,
+      background_consent: data.backgroundConsent === true,
+      signature: data.signature || null,
       status: "pending"
     })
     .select("id")
@@ -108,6 +124,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: appError?.message ?? "Failed to create application" });
   }
 
+  // Run background/credit screening (non-blocking; errors do not fail the submission)
   try {
     const { runScreening } = await import("../../../lib/runScreening");
     const screenData = await runScreening({
@@ -126,6 +143,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error("Screening follow-up error", e);
   }
 
+  // Send confirmation email (non-blocking; errors do not fail the submission)
   try {
     const { sendApplicationReceived } = await import("../../../lib/email");
     await sendApplicationReceived(data.email, appRow.id);

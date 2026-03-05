@@ -67,10 +67,17 @@ export default function ApplicationForm() {
           phone: form.phone,
           email: form.email,
           dob: form.dob,
+          currentAddress: form.currentAddress,
           previousLandlord: form.previousLandlord,
-          monthlyIncome: form.monthlyIncome,
+          monthlyRent: form.monthlyRent,
+          reasonForLeaving: form.reasonForLeaving,
           employer: form.employer,
-          position: form.position
+          position: form.position,
+          monthlyIncome: form.monthlyIncome,
+          yearsEmployed: form.yearsEmployed,
+          creditConsent: form.creditConsent,
+          backgroundConsent: form.backgroundConsent,
+          signature: form.signature
         })
       });
 
@@ -92,7 +99,7 @@ export default function ApplicationForm() {
         window.location.href = `/apply/documents?applicationId=${encodeURIComponent(appId)}`;
         return;
       }
-      alert("Application submitted. We’ll be in touch soon.");
+      alert("Application submitted. We'll be in touch soon.");
     } catch (err) {
       console.error(err);
       alert(err instanceof Error ? err.message : "There was a problem submitting your application.");
