@@ -66,6 +66,8 @@ npm run dev
 
 ## Deploy (Cloudflare Pages)
 
+**Easiest path (no build config in Cloudflare):** see **[DEPLOY.md](./DEPLOY.md)** — add 5 GitHub secrets, push to `main`, then set `nodejs_compat` once in Cloudflare.
+
 ### Deploy checklist (do in order)
 
 1. **GitHub Secrets** (repo → Settings → Secrets and variables → Actions):  
@@ -90,12 +92,19 @@ On push to `main`, the workflow builds and deploys. No Cloudflare build command 
 
 ### Option B: Cloudflare Git build
 
-1. Push to GitHub and connect the repo in **Cloudflare Dashboard** → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**.
-2. **Build command:** `npm run build:cloudflare`
-3. **Build output directory:** `.vercel/output/static` (output format from `@cloudflare/next-on-pages`; deployment is Cloudflare only).
-4. **Node.js compatibility (required):** In the Cloudflare dashboard, go to your Pages project → **Settings** → **Functions**. In the **Compatibility flags** section, for both the **Production** and **Preview** environments, type **`nodejs_compat`** in the input box and click **Save**. (Without this, the app will show a “no nodejs_compat compatibility flag set” error.)
-5. Set env vars in the Pages project (**Settings** → **Environment variables**).
-6. Add custom domain (e.g. `leasing.bannermangroup.com`) under **Custom domains**.
+If you connect the repo via **Connect to Git**, Cloudflare may read `wrangler.toml` but **will not run a build** unless you set it in the dashboard. If you see **"Output directory .vercel/output/static not found"** or **"No build command specified"**, do this:
+
+1. **Cloudflare Dashboard** → **Workers & Pages** → your project → **Settings** → **Builds & deployments**.
+2. Under **Build configuration**, set:
+   - **Build command:** `npm ci --legacy-peer-deps && npm run build:cloudflare`
+   - **Build output directory:** `.vercel/output/static`
+3. Save and **retry the deployment** (e.g. push a commit or click **Retry deployment**).
+
+Then:
+
+4. **Settings** → **Functions** → **Compatibility flags**: add **`nodejs_compat`** for Production and Preview.
+5. **Settings** → **Environment variables**: add your env vars (Supabase, etc.).
+6. Optional: **Custom domains** for your own URL.
 
 ## Screening
 
@@ -111,6 +120,7 @@ Screening is mocked in `lib/runScreening.ts`. To use **Checkr** or **RentPrep**:
 
 ## Docs
 
+- **[DEPLOY.md](./DEPLOY.md)** – Deploy in 3 steps (GitHub Actions; no Cloudflare build config).
 - **[ENV.md](./ENV.md)** – Environment variables and where to set them.
 - **[database/README.md](./database/README.md)** – Schema, migrations, and storage bucket.
 - **[TESTING.md](./TESTING.md)** – Step-by-step testing checklist for apply, dashboard, portal, sign-lease, pay, and maintenance.

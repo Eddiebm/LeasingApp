@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { supabase } from "../../../lib/supabaseClient";
+import { supabaseServer } from "../../../lib/supabaseServer";
 import { getDashboardUser } from "../../../lib/apiAuth";
 
 export const runtime = "edge";
@@ -57,8 +58,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const data = req.body;
+  const required = ["firstName", "lastName", "phone", "email", "dob"];
+  for (const key of required) {
+    if (!data[key] || String(data[key]).trim() === "") {
+      return res.status(400).json({ error: `Missing required field: ${key}` });
+    }
+  }
+  const db = supabaseServer ?? supabase;
 
-  const { data: tenantRow, error: tenantError } = await supabase
+  const { data: tenantRow, error: tenantError } = await db
     .from("tenants")
     .insert({
       first_name: data.firstName,
@@ -78,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const incomeNum = data.monthlyIncome ? parseFloat(String(data.monthlyIncome).replace(/[^0-9.]/g, "")) : null;
 
-  const { data: appRow, error: appError } = await supabase
+  const { data: appRow, error: appError } = await db
     .from("applications")
     .insert({
       property_id: data.propertyId || null,
@@ -103,7 +111,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       lastName: data.lastName,
       dob: data.dob
     });
-    await supabase
+    await db
       .from("applications")
       .update({
         credit_score: screenData.credit_score ?? null,

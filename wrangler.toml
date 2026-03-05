@@ -1,8 +1,9 @@
 # Required for @cloudflare/next-on-pages (Node built-ins).
-# Deploy with: npx wrangler pages deploy --project-name=leasingapp
-# (or: npm run build:cloudflare && npx wrangler pages deploy)
-# For Git-based deploys: set Build command in Dashboard; if the flag still isn't applied,
-# add nodejs_compat in Settings → Functions → Compatibility flags.
+# Git-based deploys: Cloudflare does NOT read build command from this file.
+# You MUST set in Dashboard → Settings → Builds & deployments:
+#   Build command: npm ci --legacy-peer-deps && npm run build:cloudflare
+#   Build output directory: .vercel/output/static
+# Also set nodejs_compat in Settings → Functions → Compatibility flags.
 name = "leasingapp"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
