@@ -15,12 +15,15 @@ Use `.env.local` for local dev. For Cloudflare Pages, set variables in the dashb
 | Variable | Where | Description |
 |----------|--------|-------------|
 | `DASHBOARD_STAFF_EMAILS` | Local + CF | Comma-separated emails allowed to use the dashboard. If unset, any signed-in Supabase user can access. |
-| `STRIPE_SECRET_KEY` | Local + CF (server only) | Stripe secret key for Payment Intents |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Local + GitHub/CF | Stripe publishable key for `/pay` page |
+| `STRIPE_SECRET_KEY` | Local + CF (server only) | Stripe secret key for Payment Intents (rent, etc.). Read via `getRequestContext().env` on Cloudflare. |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Local + GitHub/CF | Stripe publishable key for `/pay` page. |
 | `STRIPE_WEBHOOK_SECRET` | Webhook host only | Stripe webhook signing secret. Use on the host that serves `POST /api/webhooks/stripe` (see README). |
-| `RESEND_API_KEY` | Local + CF | Resend API key for confirmation emails |
+| `RESEND_API_KEY` | Local + CF | Resend API key for transactional email (application confirmation, landlord notification, approve/reject, maintenance ticket). Read via `(getRequestContext().env as Record<string, string>).RESEND_API_KEY` on Cloudflare. |
+| `LANDLORD_EMAIL` | Local + CF | Email address to notify when a tenant submits an application. Read via `getRequestContext().env` on Cloudflare. |
 | `EMAIL_FROM` | Local + CF | Sender for Resend (e.g. `Bannerman Leasing <noreply@yourdomain.com>`). Defaults to Resend onboarding address. |
-| `CHECKR_API_KEY` / `RENTPREP_API_KEY` | Local + CF | For real screening (otherwise mocked) |
+| `CHECKR_API_KEY` / `RENTPREP_API_KEY` | Local + CF | For real screening in `lib/runScreening.ts` (otherwise mocked) |
+| `SCREENING_FEE_CENTS` | Local + CF | Screening fee in cents (tenant pays). Default 3500 ($35). |
+| `STRIPE_SUBSCRIPTION_PRICE_ID` | Local + CF (server only) | Stripe Price ID for landlord SaaS subscription (e.g. `price_xxx`). Required for /dashboard/billing. |
 
 ## GitHub Actions
 

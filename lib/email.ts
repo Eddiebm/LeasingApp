@@ -12,8 +12,14 @@ export async function sendApplicationReceived(to: string, applicationId: string)
       subject: "Application received – Bannerman Leasing",
       html: `
         <p>We've received your rental application.</p>
-        <p>Application ID: <strong>${applicationId}</strong></p>
-        <p>We'll review it and get back to you soon. You can check status in the Tenant Portal.</p>
+        <p>Application ID: <strong>${applicationId}</strong>. Keep this for your records.</p>
+        <p><strong>Next steps:</strong></p>
+        <ul>
+          <li>Complete the screening payment (you'll be redirected after applying, or use the link in your application confirmation page).</li>
+          <li>After payment, we'll run your background and credit check and the landlord will review your application.</li>
+          <li>You can upload documents and check status in the Tenant Portal.</li>
+        </ul>
+        <p>We'll get back to you once the review is complete.</p>
       `
     });
     return !error;

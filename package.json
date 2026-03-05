@@ -11,7 +11,8 @@
     "start": "next start",
     "preview": "npx wrangler pages dev .vercel/output/static --compatibility-flags=nodejs_compat",
     "lint": "next lint",
-    "db:migrate": "node database/run-migrations.js"
+    "db:migrate": "node database/run-migrations.js",
+    "score": "npx lighthouse https://leasingapp.pages.dev --output=html --output-path=./lighthouse-report.html --view --chrome-flags='--headless'"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

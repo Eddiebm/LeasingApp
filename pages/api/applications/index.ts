@@ -1,5 +1,7 @@
-import { createClient } from "@supabase/supabase-js";
-import { getRequestContext } from "@cloudflare/next-on-pages";
+import { Resend } from "resend";
+import { getLandlordOrAdmin, getAdminClient } from "../../../lib/apiAuth";
+import { createSupabaseForUser } from "../../../lib/supabaseUser";
+import { getEnv } from "../../../lib/cloudflareEnv";
 
 export const runtime = "edge";
 
@@ -11,46 +13,16 @@ function json(data: unknown, status = 200) {
 }
 
 export default async function handler(req: Request) {
-  // Read env vars inside the handler so edge runtime resolves them per-request
-  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://seedtvpyhmzskkdlnblg.supabase.co";
-  const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
-    "sb_publishable_KUY0YWTlIfqPW20phruqiw_B75TXglU";
-  // Use getRequestContext to access Cloudflare env vars that Next.js strips at build time
-  let cfEnv: Record<string, string> = {};
-  try { cfEnv = (getRequestContext().env as Record<string, string>); } catch { /* not in CF runtime */ }
-  const SUPABASE_SERVICE_KEY = cfEnv.SUPABASE_SERVICE_ROLE_KEY ||
-    cfEnv.SUPABASE_SECRET_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SECRET_KEY ||
-    "";
-
   const url = new URL(req.url);
 
   if (req.method === "GET") {
-    // Use the user's own token to query — Supabase validates it automatically
-    const authHeader = req.headers.get("authorization") ?? "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    const auth = await getLandlordOrAdmin(req);
+    if (!auth || auth.role === null) return json({ error: "Unauthorized" }, 401);
+    const token = req.headers.get?.("authorization")?.startsWith("Bearer ") ? req.headers.get("authorization")!.slice(7) : null;
     if (!token) return json({ error: "Unauthorized" }, 401);
-
-    // Create a client scoped to the user's token
-    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
-
-    // Verify the token is valid by getting the user
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) return json({ error: "Unauthorized" }, 401);
-
+    const supabase = createSupabaseForUser(token);
     const propertyId = url.searchParams.get("propertyId") ?? undefined;
-
-    // Use service key client for the actual data query (bypasses RLS for admin dashboard)
-    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
-
-    let q = adminClient
+    let q = supabase
       .from("applications")
       .select(`
         id,
@@ -60,7 +32,8 @@ export default async function handler(req: Request) {
         previous_landlord,
         created_at,
         tenants ( first_name, last_name, email, phone ),
-        properties ( id, address, city, state, zip, rent )
+        properties ( id, address, city, state, zip, rent ),
+        payments ( status, payment_type )
       `)
       .order("created_at", { ascending: false });
     if (propertyId) q = q.eq("property_id", propertyId);
@@ -74,6 +47,10 @@ export default async function handler(req: Request) {
     const list = (applications ?? []).map((a: Record<string, unknown>) => {
       const tenant = a.tenants as { first_name: string; last_name: string; email: string; phone: string } | null;
       const property = a.properties as { id: string; address: string; city: string; state: string; zip: string; rent: number } | null;
+      const payments = (a.payments as { status: string; payment_type: string }[] | null) ?? [];
+      const hasPaidScreening = payments.some((p) => p.payment_type === "screening_fee" && p.status === "paid");
+      const screeningStatus: "not_paid" | "paid_pending" | "complete" =
+        a.credit_score != null ? "complete" : hasPaidScreening ? "paid_pending" : "not_paid";
       return {
         id: a.id,
         status: a.status,
@@ -86,7 +63,8 @@ export default async function handler(req: Request) {
         tenantPhone: tenant?.phone ?? "",
         propertyId: property?.id ?? null,
         propertyAddress: property ? `${property.address}, ${property.city}, ${property.state} ${property.zip}` : "",
-        rent: property?.rent ?? null
+        rent: property?.rent ?? null,
+        screeningStatus
       };
     });
 
@@ -103,8 +81,6 @@ export default async function handler(req: Request) {
   } catch {
     return json({ error: "Invalid JSON body" }, 400);
   }
-
-  // Validate required fields
   const required = ["firstName", "lastName", "phone", "email", "dob"];
   for (const key of required) {
     if (!data[key] || String(data[key]).trim() === "") {
@@ -112,9 +88,27 @@ export default async function handler(req: Request) {
     }
   }
 
-  const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
+  const db = getAdminClient();
+  if (data.landlordSlug && data.propertyId) {
+    const slug = String(data.landlordSlug);
+    const propertyId = String(data.propertyId);
+    const { data: landlord, error: landlordError } = await db.from("landlords").select("id").eq("slug", slug).maybeSingle();
+    if (landlordError) {
+      console.error(landlordError);
+      return json({ error: landlordError.message }, 500);
+    }
+    if (!landlord) return json({ error: "Unknown landlord for this application link." }, 400);
+    const { data: property, error: propertyError } = await db.from("properties").select("id, landlord_id").eq("id", propertyId).maybeSingle();
+    if (propertyError) {
+      console.error(propertyError);
+      return json({ error: propertyError.message }, 500);
+    }
+    if (!property || property.landlord_id !== landlord.id) {
+      return json({ error: "Selected property does not belong to this landlord. Please refresh and try again." }, 400);
+    }
+  }
+
+  const adminClient = getAdminClient();
 
   // Insert tenant record
   const { data: tenantRow, error: tenantError } = await adminClient
@@ -165,32 +159,47 @@ export default async function handler(req: Request) {
   }
 
   const appId = (appRow as { id: string }).id;
-
-  // Run background/credit screening (non-blocking)
-  try {
-    const { runScreening } = await import("../../../lib/runScreening");
-    const screenData = await runScreening({
-      firstName: data.firstName as string,
-      lastName: data.lastName as string,
-      dob: data.dob as string
-    });
-    await adminClient
-      .from("applications")
-      .update({
-        credit_score: screenData.credit_score ?? null,
-        background_result: { evictions: screenData.evictions, criminal_record: screenData.criminal_record }
+  const env = getEnv();
+  const resendKey = env.RESEND_API_KEY;
+  const landlordEmail = env.LANDLORD_EMAIL;
+  if (resendKey && landlordEmail) {
+    const resend = new Resend(resendKey);
+    const tenantName = `${String(data.firstName).trim()} ${String(data.lastName).trim()}`;
+    const origin = req.headers.get?.("origin") || req.headers.get?.("referer")?.replace(/\/$/, "") || "https://leasingapp.pages.dev";
+    const dashboardLink = `${origin}/dashboard`;
+    resend.emails
+      .send({
+        from: env.EMAIL_FROM ?? "Leasing <onboarding@resend.dev>",
+        to: [landlordEmail],
+        subject: "New rental application submitted",
+        html: `
+          <p>A new application has been submitted.</p>
+          <p><strong>Tenant:</strong> ${tenantName}</p>
+          <p><strong>Email:</strong> ${data.email}</p>
+          <p><strong>Phone:</strong> ${data.phone}</p>
+          <p><strong>DOB:</strong> ${data.dob}</p>
+          <p><a href="${dashboardLink}">View in dashboard</a></p>
+        `
       })
-      .eq("id", appId);
-  } catch (e) {
-    console.error("Screening follow-up error", e);
+      .catch(console.error);
   }
-
-  // Send confirmation email (non-blocking)
-  try {
-    const { sendApplicationReceived } = await import("../../../lib/email");
-    await sendApplicationReceived(data.email as string, appId);
-  } catch (e) {
-    console.error("Application email error", e);
+  if (env.RESEND_API_KEY && data.email) {
+    const origin = req.headers.get?.("origin") || req.headers.get?.("referer")?.replace(/\/$/, "") || "https://leasingapp.pages.dev";
+    const portalLink = `${origin}/portal?id=${encodeURIComponent(appId)}&email=${encodeURIComponent(String(data.email).trim())}`;
+    const resendTenant = new Resend(env.RESEND_API_KEY);
+    resendTenant.emails
+      .send({
+        from: env.EMAIL_FROM ?? "Leasing <onboarding@resend.dev>",
+        to: [data.email],
+        subject: "We've received your application",
+        html: `
+          <p>We've received your rental application.</p>
+          <p><strong>Application ID:</strong> ${appId}</p>
+          <p>You'll hear from us within 2–3 business days.</p>
+          <p><a href="${portalLink}">Check your status</a></p>
+        `
+      })
+      .catch(console.error);
   }
 
   return json({ success: true, applicationId: appId });

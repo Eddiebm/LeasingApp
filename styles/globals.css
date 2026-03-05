@@ -2,11 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mobile-friendly: tap targets and prevent zoom on focus */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   @apply bg-slate-50 text-slate-900;
 }
 
-button {
+button,
+a[role="button"],
+input[type="submit"],
+input[type="button"],
+select {
   @apply active:scale-[0.98] transition;
+}
+
+@media (pointer: coarse) {
+  button,
+  a[role="button"],
+  input:not([type="text"]):not([type="email"]):not([type="password"]):not([type="search"]),
+  select {
+    min-height: 44px;
+  }
 }
 

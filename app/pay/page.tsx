@@ -16,6 +16,7 @@ declare global {
 function PayContent() {
   const searchParams = useSearchParams();
   const [applicationId, setApplicationId] = useState(() => searchParams.get("applicationId") ?? "");
+  const [email, setEmail] = useState(() => searchParams.get("email") ?? "");
   const [amountCents, setAmountCents] = useState(0);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -26,10 +27,26 @@ function PayContent() {
 
   const amountDollars = amountCents / 100;
   const minCents = 50;
+  const publishableKey =
+    typeof process !== "undefined" ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY : undefined;
+
+  useEffect(() => {
+    if (!applicationId || !email || amountCents > 0) return;
+    fetch(
+      `/api/tenant/me?applicationId=${encodeURIComponent(applicationId)}&email=${encodeURIComponent(email)}`
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.rent != null && data.rent > 0) {
+          setAmountCents(Math.round(Number(data.rent) * 100));
+        }
+      })
+      .catch(() => {});
+  }, [applicationId, email, amountCents]);
 
   const createIntent = async () => {
-    if (!applicationId || amountCents < minCents) {
-      setError("Enter application ID and amount (min $0.50).");
+    if (!applicationId || !email || amountCents < minCents) {
+      setError("Enter application ID, email, and amount (min $0.50).");
       return;
     }
     setLoading(true);
@@ -55,7 +72,7 @@ function PayContent() {
     if (!clientSecret || !window.Stripe || !cardElementRef.current) return;
     setLoading(true);
     setError(null);
-    const stripe = window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+    const stripe = window.Stripe(publishableKey || "");
     try {
       const { error: confirmError } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: { card: cardElementRef.current }
@@ -74,7 +91,7 @@ function PayContent() {
 
   useEffect(() => {
     if (!clientSecret || !stripeReady || !window.Stripe) return;
-    const stripe = window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+    const stripe = window.Stripe(publishableKey || "");
     const elements = stripe.elements();
     const card = elements.create("card");
     const el = document.getElementById("card-element");
@@ -86,7 +103,7 @@ function PayContent() {
       (card as { unmount: () => void }).unmount();
       cardElementRef.current = null;
     };
-  }, [clientSecret, stripeReady]);
+  }, [clientSecret, stripeReady, publishableKey]);
 
   return (
     <>
@@ -95,13 +112,13 @@ function PayContent() {
         onLoad={() => setStripeReady(true)}
       />
       <main className="space-y-6">
-        <h1 className="text-2xl font-bold">Pay</h1>
+        <h1 className="text-2xl font-bold">Pay rent</h1>
         <p className="text-sm text-slate-600">
-          Enter your application ID and amount to pay (e.g. first month rent).
+          Enter your application ID and email, then the amount to pay. Your rent may be pre-filled.
         </p>
 
         {!clientSecret ? (
-          <form onSubmit={(e) => { e.preventDefault(); createIntent(); }} className="space-y-4">
+          <form onSubmit={(e) => { e.preventDefault(); createIntent(); }} className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
             <div>
               <label htmlFor="applicationId" className="block text-sm font-medium text-slate-700">Application ID</label>
               <input
@@ -110,11 +127,22 @@ function PayContent() {
                 value={applicationId}
                 onChange={(e) => setApplicationId(e.target.value)}
                 placeholder="From your confirmation email"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 min-h-[48px]"
               />
             </div>
             <div>
-              <label htmlFor="amount" className="block text-sm font-medium text-slate-700">Amount (USD)</label>
+              <label htmlFor="pay-email" className="block text-sm font-medium text-slate-700">Email</label>
+              <input
+                id="pay-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email on your application"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 min-h-[48px]"
+              />
+            </div>
+            <div>
+              <label htmlFor="amount" className="block text-sm font-medium text-slate-700">Amount due (USD)</label>
               <input
                 id="amount"
                 type="number"
@@ -122,20 +150,23 @@ function PayContent() {
                 step="0.01"
                 value={amountDollars > 0 ? amountDollars : ""}
                 onChange={(e) => setAmountCents(Math.round(parseFloat(e.target.value || "0") * 100))}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 min-h-[48px]"
               />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button
               type="submit"
-              disabled={loading}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              disabled={loading || !applicationId || !email || amountCents < minCents}
+              className="w-full min-h-[48px] rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
             >
-              {loading ? "Preparing…" : "Continue to payment"}
+              {loading ? "Preparing…" : "Pay Now"}
             </button>
           </form>
         ) : success ? (
-          <p className="text-slate-700">Payment successful. Thank you.</p>
+          <div className="rounded-2xl bg-emerald-50 p-6 text-center">
+            <h2 className="text-lg font-semibold text-emerald-800">Payment received</h2>
+            <p className="mt-2 text-slate-700">Thank you. Your payment was successful.</p>
+          </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

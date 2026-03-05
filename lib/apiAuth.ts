@@ -1,69 +1,83 @@
-import { createClient } from "@supabase/supabase-js";
-import { getRequestContext } from "@cloudflare/next-on-pages";
+import { createClient, SupabaseClient, User } from "@supabase/supabase-js";
+import { supabaseServer } from "./supabaseServer";
+import { getEnv } from "./cloudflareEnv";
 
-export type AuthResult = { user: { id: string; email: string }; email: string } | null;
+export type LandlordRow = {
+  id: string;
+  user_id: string;
+  full_name: string;
+  company_name: string | null;
+  email: string;
+  phone: string | null;
+  slug: string | null;
+  stripe_customer_id?: string | null;
+  subscription_status?: string | null;
+  subscription_current_period_end?: string | null;
+};
+
+export type AuthResult =
+  | { user: User; email: string; role: "admin" }
+  | { user: User; email: string; role: "landlord"; landlordId: string; landlord: LandlordRow }
+  | { user: User; email: string; role: null }
+  | null;
 
 /**
- * Extracts the Bearer token from a request, supporting both:
- * - Web Request API (edge runtime): req.headers.get("authorization")
- * - Old-style NextApiRequest: req.headers.authorization
+ * Resolves the dashboard user and their SaaS role/landlord.
+ * - admin: platform admin (sees all).
+ * - landlord: has a landlords row (sees only their data via RLS).
+ * - role null: authenticated but no landlord row → should complete onboarding.
+ * - null: not authenticated or tenant-only (no dashboard access).
  */
-function extractToken(req: Request | { headers: { authorization?: string } }): string | null {
-  let authHeader: string | null | undefined;
-  if (typeof (req.headers as Headers).get === "function") {
-    // Web Request API (edge runtime)
-    authHeader = (req.headers as Headers).get("authorization");
-  } else {
-    // Old-style NextApiRequest
-    authHeader = (req.headers as { authorization?: string }).authorization;
-  }
-  if (!authHeader) return null;
-  return authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+export async function getLandlordOrAdmin(req: {
+  headers: { authorization?: string };
+}): Promise<AuthResult> {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const env = getEnv();
+  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://seedtvpyhmzskkdlnblg.supabase.co";
+  const supabaseAnon = env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ?? "";
+  if (!token || !supabaseUrl || !supabaseAnon) return null;
+
+  const authClient = createClient(supabaseUrl, supabaseAnon);
+  const {
+    data: { user },
+    error,
+  } = await authClient.auth.getUser(token);
+  if (error || !user?.email) return null;
+
+  const [{ data: roleRow }, { data: landlordRows }] = await Promise.all([
+    supabaseServer.from("user_roles").select("role").eq("user_id", user.id).maybeSingle(),
+    supabaseServer.from("landlords").select("id, user_id, full_name, company_name, email, phone, slug, stripe_customer_id, subscription_status, subscription_current_period_end").eq("user_id", user.id).maybeSingle(),
+  ]);
+
+  const role = roleRow?.role;
+  const landlord = landlordRows ?? null;
+
+  if (role === "admin") return { user, email: user.email, role: "admin" };
+  if (role === "landlord" && landlord) return { user, email: user.email, role: "landlord", landlordId: landlord.id, landlord };
+  if (role === "tenant") return null;
+
+  return { user, email: user.email, role: null };
 }
 
-function getCfEnv(): Record<string, string> {
-  try { return getRequestContext().env as Record<string, string>; } catch { return {}; }
+/**
+ * @deprecated Use getLandlordOrAdmin for SaaS. Kept for backward compatibility.
+ * If DASHBOARD_STAFF_EMAILS is set, still allows those emails as legacy "staff" (no landlord row required).
+ */
+export async function getDashboardUser(req: {
+  headers: { authorization?: string };
+}): Promise<{ user: User; email: string } | null> {
+  const auth = await getLandlordOrAdmin(req);
+  if (auth && (auth.role === "admin" || auth.role === "landlord")) return { user: auth.user, email: auth.email };
+  return null;
 }
 
-export async function getDashboardUser(req: Request | { headers: { authorization?: string } }): Promise<AuthResult> {
-  // Read env vars inside the function so edge runtime resolves them per-request
-  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://seedtvpyhmzskkdlnblg.supabase.co";
-  const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
-    "sb_publishable_KUY0YWTlIfqPW20phruqiw_B75TXglU";
-
-  const token = extractToken(req);
-  if (!token) return null;
-
-  // Create a Supabase client scoped to the user's token
-  const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
-
-  const { data: { user }, error } = await client.auth.getUser();
-  if (error || !user?.email || !user?.id) return null;
-
-  const cfEnv = getCfEnv();
-  const staffList = cfEnv.DASHBOARD_STAFF_EMAILS || process.env.DASHBOARD_STAFF_EMAILS;
-  if (staffList) {
-    const allowed = staffList.split(",").map((e) => e.trim().toLowerCase());
-    if (!allowed.includes(user.email.toLowerCase())) return null;
-  }
-
-  return { user: { id: user.id, email: user.email }, email: user.email };
-}
-
-export function getAdminClient() {
-  // Use getRequestContext to access Cloudflare env vars that Next.js strips at build time
-  const cfEnv = getCfEnv();
-  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://seedtvpyhmzskkdlnblg.supabase.co";
-  const serviceKey = cfEnv.SUPABASE_SERVICE_ROLE_KEY ||
-    cfEnv.SUPABASE_SECRET_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SECRET_KEY ||
-    "";
-  return createClient(SUPABASE_URL, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
+/**
+ * Supabase admin (service role) client. Call only inside request handlers.
+ */
+export function getAdminClient(): SupabaseClient {
+  const env = getEnv();
+  const url = env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://seedtvpyhmzskkdlnblg.supabase.co";
+  const key = env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  return createClient(url, key);
 }

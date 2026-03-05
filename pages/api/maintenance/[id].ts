@@ -1,5 +1,5 @@
-import { supabase } from "../../../lib/supabaseClient";
-import { getDashboardUser } from "../../../lib/apiAuth";
+import { getLandlordOrAdmin } from "../../../lib/apiAuth";
+import { createSupabaseForUser } from "../../../lib/supabaseUser";
 
 export const runtime = "edge";
 
@@ -18,9 +18,11 @@ export default async function handler(req: Request) {
   if (!id) return json({ error: "Missing request id" }, 400);
 
   if (req.method === "PATCH") {
-    const auth = await getDashboardUser(req);
-    if (!auth) return json({ error: "Unauthorized" }, 401);
-
+    const auth = await getLandlordOrAdmin(req);
+    if (!auth || auth.role === null) return json({ error: "Unauthorized" }, 401);
+    const token = req.headers.get?.("authorization")?.startsWith("Bearer ") ? req.headers.get("authorization")!.slice(7) : null;
+    if (!token) return json({ error: "Unauthorized" }, 401);
+    const supabase = createSupabaseForUser(token);
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch { /* empty body */ }
     const { status } = body;

@@ -14,7 +14,11 @@ type Property = {
   status: string;
 };
 
-export default function ApplicationForm() {
+type ApplicationFormProps = {
+  landlordSlug?: string;
+};
+
+export default function ApplicationForm({ landlordSlug }: ApplicationFormProps) {
   const [step, setStep] = useState<Step>(1);
   const [submitting, setSubmitting] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -40,11 +44,12 @@ export default function ApplicationForm() {
   });
 
   useEffect(() => {
-    fetch("/api/properties")
+    const query = landlordSlug ? `?slug=${encodeURIComponent(landlordSlug)}` : "";
+    fetch(`/api/properties${query}`)
       .then((r) => r.json())
       .then((data) => setProperties(Array.isArray(data) ? data : []))
       .catch(() => setProperties([]));
-  }, []);
+  }, [landlordSlug]);
 
   const next = () => setStep((s) => (s < 4 ? ((s + 1) as Step) : s));
   const back = () => setStep((s) => (s > 1 ? ((s - 1) as Step) : s));
@@ -77,7 +82,8 @@ export default function ApplicationForm() {
           yearsEmployed: form.yearsEmployed,
           creditConsent: form.creditConsent,
           backgroundConsent: form.backgroundConsent,
-          signature: form.signature
+          signature: form.signature,
+          landlordSlug: landlordSlug || undefined
         })
       });
 
@@ -96,7 +102,7 @@ export default function ApplicationForm() {
       const data = await res.json().catch(() => ({}));
       const appId = data.applicationId;
       if (appId) {
-        window.location.href = `/apply/documents?applicationId=${encodeURIComponent(appId)}`;
+        window.location.href = `/apply/success?applicationId=${encodeURIComponent(appId)}&email=${encodeURIComponent(form.email)}`;
         return;
       }
       alert("Application submitted. We'll be in touch soon.");

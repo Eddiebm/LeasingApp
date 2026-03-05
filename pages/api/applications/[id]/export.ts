@@ -1,4 +1,5 @@
-import { getDashboardUser, getAdminClient } from "../../../../lib/apiAuth";
+import { getLandlordOrAdmin } from "../../../../lib/apiAuth";
+import { createSupabaseForUser } from "../../../../lib/supabaseUser";
 
 export const runtime = "edge";
 
@@ -11,16 +12,18 @@ function json(data: unknown, status = 200) {
 
 export default async function handler(req: Request) {
   if (req.method !== "GET") return new Response(null, { status: 405 });
-
-  const auth = await getDashboardUser(req);
-  if (!auth) return json({ error: "Unauthorized" }, 401);
+  const auth = await getLandlordOrAdmin(req);
+  if (!auth || auth.role === null) return json({ error: "Unauthorized" }, 401);
+  const token = req.headers.get?.("authorization")?.startsWith("Bearer ") ? req.headers.get("authorization")!.slice(7) : null;
+  if (!token) return json({ error: "Unauthorized" }, 401);
+  const supabase = createSupabaseForUser(token);
 
   const url = new URL(req.url);
   const parts = url.pathname.split("/");
   const id = parts[parts.length - 2] ?? "";
   if (!id) return json({ error: "Missing application id" }, 400);
 
-  const { data: app, error: appError } = await getAdminClient()
+  const { data: app, error: appError } = await supabase
     .from("applications")
     .select(`
       id,
@@ -41,13 +44,13 @@ export default async function handler(req: Request) {
 
   if (appError || !app) return json({ error: "Application not found" }, 404);
 
-  const { data: history } = await getAdminClient()
+  const { data: history } = await supabase
     .from("application_status_history")
     .select("from_status, to_status, changed_at, changed_by")
     .eq("application_id", id)
     .order("changed_at", { ascending: true });
 
-  const { data: docs } = await getAdminClient()
+  const { data: docs } = await supabase
     .from("documents")
     .select("type, file_url, created_at")
     .eq("application_id", id)

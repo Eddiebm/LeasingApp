@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 type TenantData = {
   applicationId: string;
@@ -17,19 +18,29 @@ type TenantData = {
 };
 
 export default function PortalPage() {
-  const [email, setEmail] = useState("");
-  const [applicationId, setApplicationId] = useState("");
+  const searchParams = useSearchParams();
+  const idFromUrl = searchParams.get("id") ?? "";
+  const emailFromUrl = searchParams.get("email") ?? "";
+  const [email, setEmail] = useState(emailFromUrl);
+  const [applicationId, setApplicationId] = useState(idFromUrl);
   const [data, setData] = useState<TenantData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const hasAutoFetched = useRef(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (idFromUrl && emailFromUrl) {
+      setApplicationId(idFromUrl);
+      setEmail(emailFromUrl);
+    }
+  }, [idFromUrl, emailFromUrl]);
+
+  const fetchStatus = async (appId: string, em: string) => {
     setError("");
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/tenant/me?applicationId=${encodeURIComponent(applicationId.trim())}&email=${encodeURIComponent(email.trim().toLowerCase())}`
+        `/api/tenant/me?applicationId=${encodeURIComponent(appId.trim())}&email=${encodeURIComponent(em.trim().toLowerCase())}`
       );
       const json = await res.json();
       if (!res.ok) {
@@ -46,19 +57,88 @@ export default function PortalPage() {
     }
   };
 
+  useEffect(() => {
+    if (idFromUrl && emailFromUrl && !hasAutoFetched.current) {
+      hasAutoFetched.current = true;
+      fetchStatus(idFromUrl, emailFromUrl);
+    }
+  }, [idFromUrl, emailFromUrl]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await fetchStatus(applicationId, email);
+  };
+
   if (data) {
+    const hasPendingPayment = data.payments.some((p) => p.status !== "paid");
+    const showPayRent = data.status === "approved" || hasPendingPayment;
+
+    const statusMessage =
+      data.status === "pending"
+        ? "Your application is under review."
+        : data.status === "approved"
+          ? "Congratulations! You've been approved. Your lease will be sent to you shortly."
+          : "Unfortunately your application was not successful at this time.";
+
+    const hasLeaseToSign = data.status === "approved" && !data.leaseSignedAt;
+    const payHref = `/pay?applicationId=${encodeURIComponent(data.applicationId)}&email=${encodeURIComponent(email.trim() || "")}`;
+
     return (
       <main className="space-y-6">
         <h1 className="text-2xl font-bold">Tenant portal</h1>
         <p className="text-sm text-slate-600">{data.tenantName} – {data.propertyAddress}</p>
-        <p className="text-xs text-slate-500">Application status: {data.status}</p>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-medium ${
+                data.status === "approved"
+                  ? "bg-green-100 text-green-800"
+                  : data.status === "rejected"
+                    ? "bg-red-100 text-red-800"
+                    : "bg-amber-100 text-amber-800"
+              }`}
+            >
+              {data.status}
+            </span>
+          </div>
+          <p className="mt-2 text-sm text-slate-700">{statusMessage}</p>
+        </div>
+
+        {hasLeaseToSign && (
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-slate-800">Lease</h2>
+            <Link
+              href={`/sign-lease?applicationId=${encodeURIComponent(data.applicationId)}&email=${encodeURIComponent(email.trim() || "")}`}
+              className="mt-2 inline-block rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              View & Sign Lease
+            </Link>
+          </section>
+        )}
 
         {data.signedLeasePdfUrl && (
           <section>
             <h2 className="text-lg font-semibold">Lease</h2>
-            <a href={data.signedLeasePdfUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">
-              View signed lease (PDF)
+            <a
+              href={data.signedLeasePdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+            >
+              Download signed lease (PDF)
             </a>
+          </section>
+        )}
+
+        {showPayRent && (
+          <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <h2 className="text-sm font-semibold text-slate-800">Payments</h2>
+            <Link
+              href={payHref}
+              className="mt-2 inline-block rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              Pay Rent
+            </Link>
           </section>
         )}
 
@@ -107,14 +187,23 @@ export default function PortalPage() {
               ))}
             </ul>
           )}
-          <p className="mt-2 text-sm text-slate-600">
-            <a href={`/pay?applicationId=${encodeURIComponent(data.applicationId)}`} className="font-medium text-blue-600 underline">
-              Pay rent or fees
-            </a>
-          </p>
+          {!showPayRent && (
+            <p className="mt-2 text-sm text-slate-600">
+              <Link href={payHref} className="font-medium text-blue-600 underline">
+                Pay rent or fees
+              </Link>
+            </p>
+          )}
         </section>
 
-        <button type="button" onClick={() => setData(null)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700">
+        <button
+          type="button"
+          onClick={() => {
+            setData(null);
+            hasAutoFetched.current = false;
+          }}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700"
+        >
           Sign out
         </button>
       </main>

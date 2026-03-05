@@ -3,19 +3,24 @@
 ## Order of operations
 
 1. Run **schema** and **seed** first (creates tables and optional seed data) in Supabase SQL Editor.
-2. Run **migrations** either:
-   - **From your machine:** Add `DATABASE_URL` to `.env.local` (Supabase → Settings → Database → Connection string → URI), then run:
-     ```bash
-     npm run db:migrate
-     ```
-   - **In Supabase:** SQL Editor → New query → paste and run `migrations/001_maintenance_and_audit.sql`, then `migrations/002_payments_lease_esign.sql`.
+2. Run **migrations** in order (Supabase SQL Editor or `npm run db:migrate` with `DATABASE_URL` in `.env.local`):
+   - `001_maintenance_and_audit.sql`
+   - `002_payments_lease_esign.sql`
+   - `003_multi_tenancy.sql` (or run `003_tables_only.sql` first, then `003_multi_tenancy.sql`) — multi-tenant RLS
+   - `004_landlord_slug.sql` — optional slug for public apply URLs (`/apply/<slug>`)
+   - `005_billing.sql` — SaaS billing fields on landlords (optional)
+   - `006_payment_type.sql` — `payments.payment_type` (e.g. screening_fee)
 
 ## Files
 
 - **schema.sql** – Core tables: tenants, properties, applications, documents.
 - **seed.sql** – Optional seed data (properties, etc.).
 - **migrations/001_maintenance_and_audit.sql** – Maintenance requests, application status history, application snapshot and audit fields, `updated_at` on applications.
-- **migrations/002_payments_lease_esign.sql** – Payments table (Stripe), lease e-sign fields on applications (`lease_signed_at`, `lease_signed_pdf_url`, `lease_sign_token`).
+- **migrations/002_payments_lease_esign.sql** – Payments table (Stripe), lease e-sign fields on applications.
+- **migrations/003_multi_tenancy.sql** – Landlords, user_roles, RLS (run after 001 and 002).
+- **migrations/004_landlord_slug.sql** – `landlords.slug` for SaaS public apply URLs.
+- **migrations/005_billing.sql** – Billing fields on landlords.
+- **migrations/006_payment_type.sql** – `payments.payment_type` for screening fee vs rent.
 
 ## Storage bucket
 

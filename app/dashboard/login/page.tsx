@@ -36,7 +36,7 @@ export default function DashboardLoginPage() {
     <main className="space-y-6">
       <h1 className="text-2xl font-bold">Dashboard sign in</h1>
       <p className="text-sm text-slate-600">
-        Use the email and password you created in Supabase (Authentication → Users).
+        Sign in to manage your properties, applications, and leases.
       </p>
       <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
         {error && (
@@ -74,6 +74,12 @@ export default function DashboardLoginPage() {
           {loading ? "Signing in…" : "Sign in"}
         </button>
       </form>
+      <p className="text-center text-sm text-slate-600">
+        Don&apos;t have an account?{" "}
+        <Link href="/dashboard/signup" className="font-medium underline">
+          Sign up
+        </Link>
+      </p>
       <Link href="/" className="block text-center text-sm underline text-slate-600">Back to home</Link>
     </main>
   );

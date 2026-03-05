@@ -52,6 +52,13 @@ export default function HomePage() {
         >
           Privacy &amp; data
         </Link>
+
+        <Link
+          href="/terms"
+          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-slate-600 text-sm"
+        >
+          Terms of Service
+        </Link>
       </div>
     </main>
   );

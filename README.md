@@ -2,6 +2,8 @@
 
 Rental agency platform for **Bannerman Group**: tenants submit applications, upload documents (ID, pay stubs, etc.), and complete due diligence; the leasing team reviews applications, runs screening, and generates leases and other documents.
 
+**Link to the site:** [https://leasingapp.pages.dev](https://leasingapp.pages.dev) (or your [custom domain](DEPLOY.md) if configured).
+
 ## Features
 
 - **Tenant flow:** Multi-step application, property selection, credit/background consent, then document upload (ID, paystub, bank statement).
@@ -77,7 +79,7 @@ npm run dev
 3. **Cloudflare** → your Pages project → **Settings** → **Functions** → **Compatibility flags**: add **`nodejs_compat`** for **Production** and **Preview** and save. (Required or the app errors at runtime.)
 4. **Cloudflare env vars** (optional for Actions): if you use Option B or want overrides, set the same vars under Pages → **Settings** → **Environment variables**.
 
-**Stripe webhook:** The route `POST /api/webhooks/stripe` uses a raw request body and Node. On Cloudflare Pages (Edge), it may not work. To receive `payment_intent.succeeded` and mark payments paid, either (a) use a separate Node endpoint (e.g. Vercel serverless) and point Stripe to that URL, or (b) run the webhook on a host that supports `bodyParser: false` and set `STRIPE_WEBHOOK_SECRET` there.
+**Stripe webhook:** The route `POST /api/webhooks/stripe` runs in Node (raw body required). See **[docs/WEBHOOK.md](./docs/WEBHOOK.md)**. On Cloudflare Pages, use a separate Node endpoint (e.g. Vercel) for the webhook. **[docs/RUNBOOK.md](./docs/RUNBOOK.md)** covers first admin, webhook URL, and migrations.
 
 ### Option A: GitHub Actions (recommended)
 
@@ -116,7 +118,11 @@ Screening is mocked in `lib/runScreening.ts`. To use **Checkr** or **RentPrep**:
 ## Document types
 
 - **Tenant uploads:** `tenant_id`, `paystub`, `bank_statement`, `other` (via `/apply/documents`).
-- **Generated:** `lease` (via dashboard “Generate Lease”); optional LOI, move-in checklist, rent receipt can be added in `lib/` and API routes.
+- **Generated (cradle to exit):** From the dashboard, per application, you can generate:
+  - **Cradle:** Lease/Rental Agreement, Letter of Intent (LOI), Move-in Checklist.
+  - **During tenancy:** Rent Reminder, Late Rent Notice, Rent Receipt, Rental Agreement Reminder, Notice of Violation (Cure or Quit), Entry Notice (24-hour), General Notice.
+  - **Exit:** Pay or Quit, Eviction Notice, Move-out Checklist, Security Deposit Disposition.
+  - All are PDFs built from application/tenant/property data; optional payload (due date, amount, reason) can be sent to `POST /api/documents/generate` for notices.
 
 ## Docs
 

@@ -1,11 +1,8 @@
 import { getAdminClient } from "../../../lib/apiAuth";
+import { getEnv } from "../../../lib/cloudflareEnv";
 import Stripe from "stripe";
 
 export const runtime = "edge";
-
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" })
-  : null;
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -16,7 +13,9 @@ function json(data: unknown, status = 200) {
 
 export default async function handler(req: Request) {
   if (req.method !== "POST") return new Response(null, { status: 405 });
-
+  const env = getEnv();
+  const stripeKey = (env as Record<string, string>).STRIPE_SECRET_KEY;
+  const stripe = stripeKey ? new Stripe(stripeKey, { apiVersion: "2024-06-20" }) : null;
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* empty body */ }
   const { applicationId, amountCents } = body;
@@ -24,7 +23,8 @@ export default async function handler(req: Request) {
     return json({ error: "applicationId and amountCents (min 50) required" }, 400);
   }
 
-  const { data: app } = await getAdminClient()
+  const supabase = getAdminClient();
+  const { data: app } = await supabase
     .from("applications")
     .select("id")
     .eq("id", applicationId)
@@ -33,7 +33,7 @@ export default async function handler(req: Request) {
 
   if (!stripe) return json({ error: "Payments not configured" }, 503);
 
-  const { data: paymentRow, error: payError } = await getAdminClient()
+  const { data: paymentRow, error: payError } = await supabase
     .from("payments")
     .insert({
       application_id: applicationId,
@@ -54,7 +54,7 @@ export default async function handler(req: Request) {
     metadata: { applicationId: applicationId as string, paymentId: (paymentRow as { id: string }).id }
   });
 
-  await getAdminClient()
+  await supabase
     .from("payments")
     .update({ stripe_payment_intent_id: paymentIntent.id })
     .eq("id", (paymentRow as { id: string }).id);
