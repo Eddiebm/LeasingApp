@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "../../../lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "../../../lib/supabaseClient";
 
 export default function DashboardLoginPage() {
   const router = useRouter();
@@ -15,6 +15,10 @@ export default function DashboardLoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (!isSupabaseConfigured) {
+      setError("Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY as GitHub Secrets and redeploy.");
+      return;
+    }
     setLoading(true);
     try {
       const { error: err } = await supabase.auth.signInWithPassword({ email, password });
