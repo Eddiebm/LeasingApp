@@ -1,4 +1,4 @@
-import { supabaseServer } from "../../lib/supabaseServer";
+import { getSupabaseServer } from "../../lib/getSupabaseServer()";
 
 export const runtime = "edge";
 
@@ -17,7 +17,7 @@ export default async function handler(req: Request) {
   const email = typeof body?.email === "string" ? body.email.trim() : "";
   if (!email) return json({ error: "Email required." }, 400);
 
-  const { data: tenant } = await supabaseServer
+  const { data: tenant } = await getSupabaseServer()
     .from("tenants")
     .select("id, first_name, last_name, email, phone, dob, created_at")
     .eq("email", email.toLowerCase())
@@ -27,12 +27,12 @@ export default async function handler(req: Request) {
     return json({ message: "If an account exists for this email, we will process your request." });
   }
 
-  const { data: applications } = await supabaseServer
+  const { data: applications } = await getSupabaseServer()
     .from("applications")
     .select("id, status, created_at")
     .eq("tenant_id", (tenant as { id: string }).id);
 
-  const { data: documents } = await supabaseServer
+  const { data: documents } = await getSupabaseServer()
     .from("documents")
     .select("type, file_url, created_at")
     .in("application_id", (applications ?? []).map((a: { id: string }) => a.id));

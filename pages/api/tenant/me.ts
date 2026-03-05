@@ -1,4 +1,4 @@
-import { supabaseServer } from "../../../lib/supabaseServer";
+import { getSupabaseServer } from "../../../lib/getSupabaseServer()";
 
 export const runtime = "edge";
 
@@ -16,7 +16,7 @@ export default async function handler(req: Request) {
   const email = url.searchParams.get("email")?.trim()?.toLowerCase() ?? "";
   if (!applicationId || !email) return json({ error: "applicationId and email required" }, 400);
 
-  const { data: app, error: appError } = await supabaseServer
+  const { data: app, error: appError } = await getSupabaseServer()
     .from("applications")
     .select(`
       id,
@@ -42,9 +42,9 @@ export default async function handler(req: Request) {
   if (tenantEmail !== email) return json({ error: "Access denied" }, 403);
 
   const [docsRes, maintenanceRes, paymentsRes] = await Promise.all([
-    supabaseServer.from("documents").select("type, file_url, created_at").eq("application_id", a.id).order("created_at", { ascending: false }),
-    supabaseServer.from("maintenance_requests").select("id, category, description, status, created_at").eq("application_id", a.id).order("created_at", { ascending: false }),
-    supabaseServer.from("payments").select("id, amount_cents, status, paid_at, created_at").eq("application_id", a.id).order("created_at", { ascending: false })
+    getSupabaseServer().from("documents").select("type, file_url, created_at").eq("application_id", a.id).order("created_at", { ascending: false }),
+    getSupabaseServer().from("maintenance_requests").select("id, category, description, status, created_at").eq("application_id", a.id).order("created_at", { ascending: false }),
+    getSupabaseServer().from("payments").select("id, amount_cents, status, paid_at, created_at").eq("application_id", a.id).order("created_at", { ascending: false })
   ]);
 
   return json({

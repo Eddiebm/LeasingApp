@@ -1,5 +1,5 @@
 import { generateLease } from "../../lib/generateLease";
-import { supabaseServer } from "../../lib/supabaseServer";
+import { getSupabaseServer } from "../../lib/getSupabaseServer()";
 import { getDashboardUser } from "../../lib/apiAuth";
 
 export const runtime = "edge";
@@ -28,23 +28,23 @@ export default async function handler(req: Request) {
     "Content-Disposition": 'attachment; filename="lease.pdf"'
   };
 
-  if (applicationId && supabaseServer) {
+  if (applicationId) {
     try {
       const bucket = "documents";
       const fileName = `lease-${applicationId}-${Date.now()}.pdf`;
-      const { error: uploadError } = await supabaseServer.storage
+      const { error: uploadError } = await getSupabaseServer().storage
         .from(bucket)
         .upload(fileName, pdfBytes, { contentType: "application/pdf", upsert: true });
 
       if (!uploadError) {
-        const { data: urlData } = supabaseServer.storage.from(bucket).getPublicUrl(fileName);
-        await supabaseServer.from("documents").insert({
+        const { data: urlData } = getSupabaseServer().storage.from(bucket).getPublicUrl(fileName);
+        await getSupabaseServer().from("documents").insert({
           application_id: applicationId,
           type: "lease",
           file_url: urlData.publicUrl
         });
         const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-        await supabaseServer.from("applications").update({ lease_sign_token: token }).eq("id", applicationId);
+        await getSupabaseServer().from("applications").update({ lease_sign_token: token }).eq("id", applicationId);
         responseHeaders["X-Lease-Sign-Token"] = token;
       }
     } catch (e) {

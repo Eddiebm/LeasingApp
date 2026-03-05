@@ -1,5 +1,5 @@
 import { supabase } from "../../../lib/supabaseClient";
-import { supabaseServer } from "../../../lib/supabaseServer";
+import { getSupabaseServer } from "../../../lib/getSupabaseServer()";
 
 export const runtime = "edge";
 
@@ -89,7 +89,7 @@ export default async function handler(req: Request) {
   }
 
   // Look up the most recent application by tenant email
-  const { data: application, error: appError } = await supabaseServer
+  const { data: application, error: appError } = await getSupabaseServer()
     .from("applications")
     .select("id, tenants ( email )")
     .eq("tenants.email", String(email).trim().toLowerCase())
@@ -104,7 +104,7 @@ export default async function handler(req: Request) {
   const applicationId = (application as { id: string }).id;
   const tenantEmail = (application as { tenants: { email: string } | null }).tenants?.email;
 
-  const { data: row, error } = await supabaseServer
+  const { data: row, error } = await getSupabaseServer()
     .from("maintenance_requests")
     .insert({
       application_id: applicationId,

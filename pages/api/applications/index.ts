@@ -1,5 +1,5 @@
 import { supabase } from "../../../lib/supabaseClient";
-import { supabaseServer } from "../../../lib/supabaseServer";
+import { getSupabaseServer } from "../../../lib/getSupabaseServer()";
 import { getDashboardUser } from "../../../lib/apiAuth";
 
 export const runtime = "edge";
@@ -87,7 +87,7 @@ export default async function handler(req: Request) {
     }
   }
 
-  const db = supabaseServer;
+  const db = getSupabaseServer();
 
   // Insert tenant record
   const { data: tenantRow, error: tenantError } = await db

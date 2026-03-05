@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { supabaseServer } from "../../../lib/supabaseServer";
+import { getSupabaseServer } from "../../../lib/getSupabaseServer()";
 
 export const runtime = "edge";
 
@@ -24,7 +24,7 @@ export default async function handler(req: Request) {
     return json({ error: "applicationId and amountCents (min 50) required" }, 400);
   }
 
-  const { data: app } = await supabaseServer
+  const { data: app } = await getSupabaseServer()
     .from("applications")
     .select("id")
     .eq("id", applicationId)
@@ -33,7 +33,7 @@ export default async function handler(req: Request) {
 
   if (!stripe) return json({ error: "Payments not configured" }, 503);
 
-  const { data: paymentRow, error: payError } = await supabaseServer
+  const { data: paymentRow, error: payError } = await getSupabaseServer()
     .from("payments")
     .insert({
       application_id: applicationId,
@@ -54,7 +54,7 @@ export default async function handler(req: Request) {
     metadata: { applicationId: applicationId as string, paymentId: (paymentRow as { id: string }).id }
   });
 
-  await supabaseServer
+  await getSupabaseServer()
     .from("payments")
     .update({ stripe_payment_intent_id: paymentIntent.id })
     .eq("id", (paymentRow as { id: string }).id);

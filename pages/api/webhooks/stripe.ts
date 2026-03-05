@@ -1,4 +1,4 @@
-import { supabaseServer } from "../../../lib/supabaseServer";
+import { getSupabaseServer } from "../../../lib/getSupabaseServer()";
 
 export const runtime = "edge";
 
@@ -72,7 +72,7 @@ export default async function handler(req: Request) {
   if (event.type === "payment_intent.succeeded") {
     const paymentId = event.data?.object?.metadata?.paymentId;
     if (paymentId) {
-      await supabaseServer
+      await getSupabaseServer()
         .from("payments")
         .update({ status: "paid", paid_at: new Date().toISOString() })
         .eq("id", paymentId);

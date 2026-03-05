@@ -1,5 +1,5 @@
 import { getDashboardUser } from "../../../../lib/apiAuth";
-import { supabaseServer } from "../../../../lib/supabaseServer";
+import { getSupabaseServer } from "../../../../lib/getSupabaseServer()";
 
 export const runtime = "edge";
 
@@ -21,7 +21,7 @@ export default async function handler(req: Request) {
   const id = parts[parts.length - 2] ?? "";
   if (!id) return json({ error: "Missing application id" }, 400);
 
-  const { data: app, error: appError } = await supabaseServer
+  const { data: app, error: appError } = await getSupabaseServer()
     .from("applications")
     .select(`
       id,
@@ -42,13 +42,13 @@ export default async function handler(req: Request) {
 
   if (appError || !app) return json({ error: "Application not found" }, 404);
 
-  const { data: history } = await supabaseServer
+  const { data: history } = await getSupabaseServer()
     .from("application_status_history")
     .select("from_status, to_status, changed_at, changed_by")
     .eq("application_id", id)
     .order("changed_at", { ascending: true });
 
-  const { data: docs } = await supabaseServer
+  const { data: docs } = await getSupabaseServer()
     .from("documents")
     .select("type, file_url, created_at")
     .eq("application_id", id)
