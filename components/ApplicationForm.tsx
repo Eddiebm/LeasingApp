@@ -75,9 +75,15 @@ export default function ApplicationForm() {
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        const msg = err?.error || res.statusText || "Failed to submit application";
-        throw new Error(`${msg} (${res.status})`);
+        const text = await res.text();
+        let msg = "Failed to submit application";
+        try {
+          const err = JSON.parse(text);
+          if (err?.error) msg = err.error;
+        } catch {
+          if (text) msg = text.slice(0, 100);
+        }
+        throw new Error(`${msg} [${res.status}]`);
       }
 
       const data = await res.json().catch(() => ({}));
