@@ -1,14 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
+import { getRequestContext } from "@cloudflare/next-on-pages";
 
 export const runtime = "edge";
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://seedtvpyhmzskkdlnblg.supabase.co";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
-  "sb_publishable_KUY0YWTlIfqPW20phruqiw_B75TXglU";
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_SECRET_KEY ||
-  "";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -18,6 +11,20 @@ function json(data: unknown, status = 200) {
 }
 
 export default async function handler(req: Request) {
+  // Read env vars inside the handler so edge runtime resolves them per-request
+  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://seedtvpyhmzskkdlnblg.supabase.co";
+  const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
+    "sb_publishable_KUY0YWTlIfqPW20phruqiw_B75TXglU";
+  // Use getRequestContext to access Cloudflare env vars that Next.js strips at build time
+  let cfEnv: Record<string, string> = {};
+  try { cfEnv = (getRequestContext().env as Record<string, string>); } catch { /* not in CF runtime */ }
+  const SUPABASE_SERVICE_KEY = cfEnv.SUPABASE_SERVICE_ROLE_KEY ||
+    cfEnv.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+    "";
+
   const url = new URL(req.url);
 
   if (req.method === "GET") {
@@ -37,12 +44,12 @@ export default async function handler(req: Request) {
     if (authError || !user) return json({ error: "Unauthorized" }, 401);
 
     const propertyId = url.searchParams.get("propertyId") ?? undefined;
-    
+
     // Use service key client for the actual data query (bypasses RLS for admin dashboard)
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
-    
+
     let q = adminClient
       .from("applications")
       .select(`

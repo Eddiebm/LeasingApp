@@ -1,11 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
+import { getRequestContext } from "@cloudflare/next-on-pages";
 
 export type AuthResult = { user: { id: string; email: string }; email: string } | null;
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://seedtvpyhmzskkdlnblg.supabase.co";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
-  "sb_publishable_KUY0YWTlIfqPW20phruqiw_B75TXglU";
 
 /**
  * Extracts the Bearer token from a request, supporting both:
@@ -25,7 +21,17 @@ function extractToken(req: Request | { headers: { authorization?: string } }): s
   return authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
 }
 
+function getCfEnv(): Record<string, string> {
+  try { return getRequestContext().env as Record<string, string>; } catch { return {}; }
+}
+
 export async function getDashboardUser(req: Request | { headers: { authorization?: string } }): Promise<AuthResult> {
+  // Read env vars inside the function so edge runtime resolves them per-request
+  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://seedtvpyhmzskkdlnblg.supabase.co";
+  const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
+    "sb_publishable_KUY0YWTlIfqPW20phruqiw_B75TXglU";
+
   const token = extractToken(req);
   if (!token) return null;
 
@@ -38,7 +44,8 @@ export async function getDashboardUser(req: Request | { headers: { authorization
   const { data: { user }, error } = await client.auth.getUser();
   if (error || !user?.email || !user?.id) return null;
 
-  const staffList = process.env.DASHBOARD_STAFF_EMAILS;
+  const cfEnv = getCfEnv();
+  const staffList = cfEnv.DASHBOARD_STAFF_EMAILS || process.env.DASHBOARD_STAFF_EMAILS;
   if (staffList) {
     const allowed = staffList.split(",").map((e) => e.trim().toLowerCase());
     if (!allowed.includes(user.email.toLowerCase())) return null;
@@ -48,7 +55,12 @@ export async function getDashboardUser(req: Request | { headers: { authorization
 }
 
 export function getAdminClient() {
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  // Use getRequestContext to access Cloudflare env vars that Next.js strips at build time
+  const cfEnv = getCfEnv();
+  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://seedtvpyhmzskkdlnblg.supabase.co";
+  const serviceKey = cfEnv.SUPABASE_SERVICE_ROLE_KEY ||
+    cfEnv.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SECRET_KEY ||
     "";
   return createClient(SUPABASE_URL, serviceKey, {
