@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -17,7 +17,7 @@ type TenantData = {
   payments: { id: string; amountCents: number; status: string; paidAt: string | null; createdAt: string }[];
 };
 
-export default function PortalPage() {
+function PortalContent() {
   const searchParams = useSearchParams();
   const idFromUrl = searchParams.get("id") ?? "";
   const emailFromUrl = searchParams.get("email") ?? "";
@@ -247,5 +247,13 @@ export default function PortalPage() {
       </form>
       <Link href="/" className="block text-center text-sm underline text-slate-600">Back to home</Link>
     </main>
+  );
+}
+
+export default function PortalPage() {
+  return (
+    <Suspense fallback={<main className="flex min-h-screen items-center justify-center"><p className="text-slate-500">Loading…</p></main>}>
+      <PortalContent />
+    </Suspense>
   );
 }

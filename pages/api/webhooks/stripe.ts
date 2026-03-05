@@ -1,3 +1,5 @@
+export const runtime = "edge";
+
 import { getAdminClient } from "../../../lib/apiAuth";
 import { supabaseServer } from "../../../lib/supabaseServer";
 

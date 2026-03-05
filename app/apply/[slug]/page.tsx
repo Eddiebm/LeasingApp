@@ -1,3 +1,5 @@
+export const runtime = "edge";
+
 import ApplicationForm from "../../../components/ApplicationForm";
 
 type ApplyForLandlordPageProps = {
@@ -18,4 +20,3 @@ export default function ApplyForLandlordPage({ params }: ApplyForLandlordPagePro
     </main>
   );
 }
-
