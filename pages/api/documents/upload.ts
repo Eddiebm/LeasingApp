@@ -49,7 +49,7 @@ export default async function handler(req: Request) {
 
   const ext = fileName?.split(".").pop() || "bin";
   const safeName = `${type}-${applicationId}-${Date.now()}.${ext}`;
-  const bucket = "documents";
+  const bucket = "Documents";
 
   const { error: uploadError } = await supabaseServer.storage
     .from(bucket)
