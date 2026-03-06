@@ -9,7 +9,7 @@ import { useSubscription } from "../../components/SubscriptionContext";
 import { FREE_PROPERTY_LIMIT } from "../../lib/subscription";
 import { supabase } from "../../lib/supabaseClient";
 
-type Property = { id: string; address: string; city: string; state: string; zip: string; rent?: number };
+type Property = { id: string; address: string; city: string; state: string; zip: string; rent?: number; is_listed?: boolean; listing_slug?: string | null };
 type Application = {
   id: string;
   tenantName: string;
@@ -507,22 +507,46 @@ export default function Dashboard() {
       </section>
 
       {properties.length > 0 && (
-        <div className="flex items-center gap-2">
-          <label htmlFor="property-filter" className="text-sm font-medium text-slate-700">Property:</label>
-          <select
-            id="property-filter"
-            value={propertyId}
-            onChange={(e) => setPropertyId(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-          >
-            <option value="">All properties</option>
+        <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-800">Your properties</h2>
+          <div className="space-y-2">
             {properties.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.address}, {p.city}
-              </option>
+              <div key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-800 truncate">{p.address}, {p.city}, {p.state}</p>
+                  {p.rent && <p className="text-xs text-slate-500">${p.rent.toLocaleString()}/mo</p>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {p.is_listed && (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">Live</span>
+                  )}
+                  <Link
+                    href={`/dashboard/properties/${p.id}/listing`}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    {p.is_listed ? "Share listing" : "Create listing"}
+                  </Link>
+                </div>
+              </div>
             ))}
-          </select>
-        </div>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <label htmlFor="property-filter" className="text-sm font-medium text-slate-700">Filter by property:</label>
+            <select
+              id="property-filter"
+              value={propertyId}
+              onChange={(e) => setPropertyId(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">All properties</option>
+              {properties.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.address}, {p.city}
+                </option>
+              ))}
+            </select>
+          </div>
+        </section>
       )}
 
       <section className="space-y-3">
