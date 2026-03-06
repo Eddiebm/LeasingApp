@@ -33,6 +33,8 @@ export type AuthResult =
  * - role null: authenticated but no landlord row → should complete onboarding.
  * - null: not authenticated or tenant-only (no dashboard access).
  */
+const ADMIN_USER_ID = "4c447225-b57c-4da1-83ff-94cc25ad6755";
+
 export async function getLandlordOrAdmin(req: {
   headers: { authorization?: string } | { get?: (k: string) => string | null };
 }): Promise<AuthResult> {
@@ -54,6 +56,11 @@ export async function getLandlordOrAdmin(req: {
     error,
   } = await authClient.auth.getUser(token);
   if (error || !user?.email) return null;
+
+  // Hardcoded bootstrap admin bypass for Cloudflare runtime when service role key is unavailable.
+  if (user.id === ADMIN_USER_ID) {
+    return { user, email: user.email, role: "admin" };
+  }
 
   const [{ data: roleRow }, { data: landlordRows }] = await Promise.all([
     getSupabaseServer().from("user_roles").select("role").eq("user_id", user.id).maybeSingle(),

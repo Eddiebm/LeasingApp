@@ -74,6 +74,8 @@ type CommandCenterData = {
 };
 
 const PERIODS = ["day", "week", "month", "year"] as const;
+const ADMIN_USER_ID = "4c447225-b57c-4da1-83ff-94cc25ad6755";
+const ACCESS_REDIRECT_DELAY_MS = 2500;
 
 function formatCents(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
@@ -85,8 +87,9 @@ function formatDate(iso: string): string {
 
 export default function CommandCenterPage() {
   const router = useRouter();
-  const [session, setSession] = useState<{ access_token: string } | null>(null);
+  const [session, setSession] = useState<{ access_token: string; user?: { id?: string } } | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [accessChecked, setAccessChecked] = useState(false);
   const [period, setPeriod] = useState<typeof PERIODS[number]>("month");
   const [data, setData] = useState<CommandCenterData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -98,20 +101,33 @@ export default function CommandCenterPage() {
 
   useEffect(() => {
     if (!session?.access_token) return;
+
+    const isKnownAdminUser = session?.user?.id === ADMIN_USER_ID;
+    let redirectTimer: ReturnType<typeof setTimeout> | null = null;
+
     fetch("/api/dashboard/me", { headers: { Authorization: `Bearer ${session.access_token}` } })
       .then((r) => r.json())
       .then((me) => {
         setRole(me.role ?? null);
-        if (me.role !== "admin") {
-          router.replace("/dashboard");
-          return;
+        const explicitNonAdminRole = typeof me.role === "string" && me.role !== "admin";
+        if (explicitNonAdminRole && !isKnownAdminUser) {
+          redirectTimer = setTimeout(() => {
+            router.replace("/dashboard");
+          }, ACCESS_REDIRECT_DELAY_MS);
         }
       })
-      .catch(() => setRole(null));
-  }, [session?.access_token, router]);
+      .catch(() => setRole(null))
+      .finally(() => setAccessChecked(true));
+
+    return () => {
+      if (redirectTimer) clearTimeout(redirectTimer);
+    };
+  }, [session?.access_token, session?.user?.id, router]);
+
+  const isKnownAdminUser = session?.user?.id === ADMIN_USER_ID;
 
   const fetchData = useCallback(() => {
-    if (!session?.access_token || role !== "admin") return;
+    if (!session?.access_token || (role !== "admin" && !isKnownAdminUser)) return;
     setLoading(true);
     setError(null);
     fetch(`/api/admin/command-center?period=${period}`, {
@@ -124,13 +140,13 @@ export default function CommandCenterPage() {
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [session?.access_token, role, period]);
+  }, [session?.access_token, role, period, isKnownAdminUser]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  if (role !== "admin") {
+  if (!accessChecked || (role !== "admin" && !isKnownAdminUser)) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-8">
         <p className="text-slate-600">Checking access…</p>
