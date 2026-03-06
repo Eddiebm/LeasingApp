@@ -1,7 +1,7 @@
 export const runtime = "edge";
 
 import { getAdminClient } from "../../../lib/apiAuth";
-import { supabaseServer } from "../../../lib/supabaseServer";
+import { getSupabaseServer } from "../../../lib/supabaseServer";
 
 // Run on Node so raw body is available (required for Stripe signature verification).
 // On Cloudflare Pages/Edge, use a separate Node webhook endpoint (see docs/WEBHOOK.md).
@@ -87,7 +87,7 @@ export default async function handler(req: Request) {
   if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
     const sub = event.data?.object as { customer?: string; status?: string; current_period_end?: number } | undefined;
     if (sub?.customer) {
-      const { data: landlord } = await supabaseServer
+      const { data: landlord } = await getSupabaseServer()
         .from("landlords")
         .select("id")
         .eq("stripe_customer_id", sub.customer)
@@ -97,7 +97,7 @@ export default async function handler(req: Request) {
         const periodEnd = sub.current_period_end
           ? new Date(sub.current_period_end * 1000).toISOString()
           : null;
-        await supabaseServer
+        await getSupabaseServer()
           .from("landlords")
           .update({
             subscription_status: status,
@@ -116,7 +116,7 @@ export default async function handler(req: Request) {
         .update({ status: "paid", paid_at: new Date().toISOString() })
         .eq("id", paymentId);
 
-      const { data: payment } = await supabaseServer
+      const { data: payment } = await getSupabaseServer()
         .from("payments")
         .select("application_id, payment_type")
         .eq("id", paymentId)
@@ -124,7 +124,7 @@ export default async function handler(req: Request) {
 
       if (payment && (payment as { payment_type: string }).payment_type === "screening_fee") {
         const applicationId = (payment as { application_id: string }).application_id;
-        const { data: app } = await supabaseServer
+        const { data: app } = await getSupabaseServer()
           .from("applications")
           .select("id, tenants ( first_name, last_name, dob )")
           .eq("id", applicationId)
@@ -139,7 +139,7 @@ export default async function handler(req: Request) {
                 lastName: tenant.last_name,
                 dob: tenant.dob
               });
-              await supabaseServer
+              await getSupabaseServer()
                 .from("applications")
                 .update({
                   credit_score: screenData.credit_score ?? null,

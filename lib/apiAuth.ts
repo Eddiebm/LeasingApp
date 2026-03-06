@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient, User } from "@supabase/supabase-js";
-import { supabaseServer } from "./supabaseServer";
+import { getSupabaseServer } from "./supabaseServer";
 import { getEnv } from "./cloudflareEnv";
 
 export type LandlordRow = {
@@ -46,8 +46,8 @@ export async function getLandlordOrAdmin(req: {
   if (error || !user?.email) return null;
 
   const [{ data: roleRow }, { data: landlordRows }] = await Promise.all([
-    supabaseServer.from("user_roles").select("role").eq("user_id", user.id).maybeSingle(),
-    supabaseServer.from("landlords").select("id, user_id, full_name, company_name, email, phone, slug, stripe_customer_id, subscription_status, subscription_current_period_end").eq("user_id", user.id).maybeSingle(),
+    getSupabaseServer().from("user_roles").select("role").eq("user_id", user.id).maybeSingle(),
+    getSupabaseServer().from("landlords").select("id, user_id, full_name, company_name, email, phone, slug, stripe_customer_id, subscription_status, subscription_current_period_end").eq("user_id", user.id).maybeSingle(),
   ]);
 
   const role = roleRow?.role;

@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import Stripe from "stripe";
-import { supabaseServer } from "../../../lib/supabaseServer";
+import { getSupabaseServer } from "../../../lib/supabaseServer";
 
 export const runtime = "edge";
 
@@ -17,14 +17,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "applicationId required" });
   }
 
-  const { data: app } = await supabaseServer
+  const { data: app } = await getSupabaseServer()
     .from("applications")
     .select("id")
     .eq("id", applicationId)
     .single();
   if (!app) return res.status(404).json({ error: "Application not found" });
 
-  const { data: existing } = await supabaseServer
+  const { data: existing } = await getSupabaseServer()
     .from("payments")
     .select("id, status")
     .eq("application_id", applicationId)
@@ -36,7 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!stripe) return res.status(503).json({ error: "Payments not configured" });
 
-  const { data: paymentRow, error: payError } = await supabaseServer
+  const { data: paymentRow, error: payError } = await getSupabaseServer()
     .from("payments")
     .insert({
       application_id: applicationId,
@@ -62,7 +62,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   });
 
-  await supabaseServer
+  await getSupabaseServer()
     .from("payments")
     .update({ stripe_payment_intent_id: paymentIntent.id })
     .eq("id", (paymentRow as { id: string }).id);

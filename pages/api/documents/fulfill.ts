@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import Stripe from "stripe";
 import { getRequestContext } from "@cloudflare/next-on-pages";
-import { getSupabaseServer } from "../../lib/supabaseServer";
+import { getSupabaseServer } from "../../../lib/supabaseServer";
 
 export const runtime = "edge";
 

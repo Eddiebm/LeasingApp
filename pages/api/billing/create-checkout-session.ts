@@ -3,7 +3,7 @@ export const runtime = "edge";
 import type { NextApiRequest, NextApiResponse } from "next";
 import Stripe from "stripe";
 import { getLandlordOrAdmin } from "../../../lib/apiAuth";
-import { supabaseServer } from "../../../lib/supabaseServer";
+import { getSupabaseServer } from "../../../lib/supabaseServer";
 
 const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" })
@@ -31,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       metadata: { landlord_id: landlordId }
     });
     customerId = customer.id;
-    await supabaseServer
+    await getSupabaseServer()
       .from("landlords")
       .update({ stripe_customer_id: customerId })
       .eq("id", landlordId);

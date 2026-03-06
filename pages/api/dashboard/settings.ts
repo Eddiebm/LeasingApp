@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getLandlordOrAdmin } from "../../../lib/apiAuth";
 import { createSupabaseForUser } from "../../../lib/supabaseUser";
-import { supabaseServer } from "../../../lib/supabaseServer";
+import { getSupabaseServer } from "../../../lib/supabaseServer";
 
 export const runtime = "edge";
 
@@ -41,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (rawSlug !== undefined) {
     const slug = typeof rawSlug === "string" ? slugify(rawSlug) : "";
     if (!slug) return res.status(400).json({ error: "Slug cannot be empty" });
-    const { data: existing } = await supabaseServer
+    const { data: existing } = await getSupabaseServer()
       .from("landlords")
       .select("id")
       .eq("slug", slug)

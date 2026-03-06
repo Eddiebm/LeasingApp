@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { supabaseServer } from "../../../lib/supabaseServer";
+import { getSupabaseServer } from "../../../lib/supabaseServer";
 import { getLandlordOrAdmin } from "../../../lib/apiAuth";
 
 export const runtime = "edge";
@@ -43,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "A landlord is required for this property." });
   }
 
-  const { data, error } = await supabaseServer
+  const { data, error } = await getSupabaseServer()
     .from("properties")
     .insert({
       landlord_id: landlordId,

@@ -1,5 +1,5 @@
 import { getRequestContext } from "@cloudflare/next-on-pages";
-import { getAdminClient } from "../../lib/apiAuth";
+import { getAdminClient } from "../../../lib/apiAuth";
 
 export const runtime = "edge";
 

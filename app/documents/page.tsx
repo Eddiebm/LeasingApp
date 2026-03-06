@@ -1,14 +1,13 @@
 "use client";
-
 import Link from "next/link";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 type Message = { role: "user" | "assistant"; content: string };
 
 const PREVIEW_CHARS = 700;
 
-export default function DocumentsPage() {
+function DocumentsPageInner() {
   const searchParams = useSearchParams();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -274,5 +273,13 @@ export default function DocumentsPage() {
         AI-generated documents are for information only, not legal advice.
       </p>
     </main>
+  );
+}
+
+export default function DocumentsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center"><p className="text-slate-400">Loading...</p></div>}>
+      <DocumentsPageInner />
+    </Suspense>
   );
 }

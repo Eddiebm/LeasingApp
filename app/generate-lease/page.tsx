@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 const US_STATES = [
@@ -73,7 +73,7 @@ const initialForm: FormData = {
 
 const MAX_TENANTS = 4;
 
-export default function GenerateLeasePage() {
+function GenerateLeasePageInner() {
   const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormData>(initialForm);
@@ -670,5 +670,13 @@ export default function GenerateLeasePage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function GenerateLeasePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center"><p className="text-slate-400">Loading...</p></div>}>
+      <GenerateLeasePageInner />
+    </Suspense>
   );
 }

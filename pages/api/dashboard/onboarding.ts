@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { getLandlordOrAdmin } from "../../../lib/apiAuth";
-import { supabaseServer } from "../../../lib/supabaseServer";
+import { getSupabaseServer } from "../../../lib/supabaseServer";
 
 export const runtime = "edge";
 
@@ -34,10 +34,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!slug) slug = slugify(fullNameStr);
   if (!slug) return res.status(400).json({ error: "Could not generate a slug; provide slug or companyName" });
 
-  const { data: existing } = await supabaseServer.from("landlords").select("id").eq("slug", slug).maybeSingle();
+  const { data: existing } = await getSupabaseServer().from("landlords").select("id").eq("slug", slug).maybeSingle();
   if (existing) return res.status(409).json({ error: "This URL slug is already taken. Choose another." });
 
-  const { data: landlord, error: landlordError } = await supabaseServer
+  const { data: landlord, error: landlordError } = await getSupabaseServer()
     .from("landlords")
     .insert({
       user_id: auth.user.id,
@@ -55,14 +55,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: landlordError?.message ?? "Failed to create landlord profile" });
   }
 
-  const { error: roleError } = await supabaseServer.from("user_roles").upsert(
+  const { error: roleError } = await getSupabaseServer().from("user_roles").upsert(
     { user_id: auth.user.id, role: "landlord" },
     { onConflict: "user_id" }
   );
 
   if (roleError) {
     console.error(roleError);
-    await supabaseServer.from("landlords").delete().eq("id", landlord.id);
+    await getSupabaseServer().from("landlords").delete().eq("id", landlord.id);
     return res.status(500).json({ error: "Failed to assign role" });
   }
 

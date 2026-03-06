@@ -1,5 +1,5 @@
 import { supabase } from "../../../lib/supabaseClient";
-import { supabaseServer } from "../../../lib/supabaseServer";
+import { getSupabaseServer } from "../../../lib/supabaseServer";
 import { getLandlordOrAdmin } from "../../../lib/apiAuth";
 import { createSupabaseForUser } from "../../../lib/supabaseUser";
 
@@ -37,7 +37,7 @@ export default async function handler(req: Request) {
 
   const landlordSlug = url.searchParams.get("slug") ?? undefined;
   if (landlordSlug) {
-    const { data: landlord, error: landlordError } = await supabaseServer
+    const { data: landlord, error: landlordError } = await getSupabaseServer()
       .from("landlords")
       .select("id")
       .eq("slug", landlordSlug)
@@ -47,7 +47,7 @@ export default async function handler(req: Request) {
       return json({ error: landlordError.message }, 500);
     }
     if (!landlord) return json({ error: "Landlord not found" }, 404);
-    const { data, error } = await supabaseServer
+    const { data, error } = await getSupabaseServer()
       .from("properties")
       .select("id, address, city, state, zip, rent, status, application_deadline")
       .eq("status", "active")

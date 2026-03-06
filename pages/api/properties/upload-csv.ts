@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { supabaseServer } from "../../../lib/supabaseServer";
+import { getSupabaseServer } from "../../../lib/supabaseServer";
 import { getLandlordOrAdmin } from "../../../lib/apiAuth";
 
 export const runtime = "edge";
@@ -86,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     status: "active",
   }));
 
-  const { data, error } = await supabaseServer.from("properties").insert(rows).select("id, address, city, state, zip, rent");
+  const { data, error } = await getSupabaseServer().from("properties").insert(rows).select("id, address, city, state, zip, rent");
 
   if (error) {
     console.error(error);
