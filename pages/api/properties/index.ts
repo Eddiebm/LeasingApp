@@ -25,7 +25,7 @@ export default async function handler(req: Request) {
     const supabaseDashboard = createSupabaseForUser(token);
     const { data, error } = await supabaseDashboard
       .from("properties")
-      .select("id, address, city, state, zip, rent, status, application_deadline")
+      .select("id, address, city, state, zip, rent, status, application_deadline, is_listed, listing_slug, listing_headline, bedrooms, bathrooms, available_from")
       .eq("status", "active")
       .order("created_at", { ascending: false });
     if (error) {
@@ -49,7 +49,7 @@ export default async function handler(req: Request) {
     if (!landlord) return json({ error: "Landlord not found" }, 404);
     const { data, error } = await getSupabaseServer()
       .from("properties")
-      .select("id, address, city, state, zip, rent, status, application_deadline")
+      .select("id, address, city, state, zip, rent, status, application_deadline, is_listed, listing_slug, listing_headline, bedrooms, bathrooms, available_from")
       .eq("status", "active")
       .eq("landlord_id", landlord.id)
       .order("created_at", { ascending: false });
@@ -62,7 +62,7 @@ export default async function handler(req: Request) {
 
   const { data, error } = await supabase
     .from("properties")
-    .select("id, address, city, state, zip, rent, status, application_deadline")
+    .select("id, address, city, state, zip, rent, status, application_deadline, is_listed, listing_slug, listing_headline, bedrooms, bathrooms, available_from")
     .eq("status", "active")
     .order("created_at", { ascending: false });
 

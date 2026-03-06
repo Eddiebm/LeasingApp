@@ -13,6 +13,11 @@ const nextConfig = {
     SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY || "",
     SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
   },
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "seedtvpyhmzskkdlnblg.supabase.co" },
+    ],
+  },
 };
 
 export default nextConfig;
