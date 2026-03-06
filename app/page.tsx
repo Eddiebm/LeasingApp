@@ -2,109 +2,81 @@ import Link from "next/link";
 
 export default function HomePage() {
   return (
-    <main className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-bold">Bannerman Leasing</h1>
-        <p className="text-sm text-slate-600">
-          Simple tenant applications, screenings, and leases for The Bannerman Group.
+    <main className="space-y-10">
+      <header className="space-y-3">
+        <h1 className="text-3xl font-bold text-slate-900">
+          Simple property management for independent landlords
+        </h1>
+        <p className="text-sm text-slate-600 max-w-xl">
+          Generate leases, screen tenants, and manage applications — without the paperwork.
         </p>
       </header>
 
-      <div className="grid gap-4">
-        <Link
-          href="/documents"
-          className="rounded-xl bg-slate-900 px-4 py-4 text-center text-white text-base font-medium shadow-md hover:bg-slate-800"
-        >
-          <span className="block">Get a lease or eviction notice</span>
-          <span className="mt-1 block text-sm font-normal text-slate-300">
-            Just say what you need in plain English — no forms, no dropdowns
-          </span>
-        </Link>
+      <section className="grid gap-8 md:grid-cols-2">
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">For landlords</h2>
+          <p className="text-sm text-slate-600">
+            Set up a new rental or start the eviction process in a few clicks.
+          </p>
+          <div className="space-y-3 pt-2">
+            <Link
+              href="/generate-lease"
+              className="block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-medium text-white hover:bg-slate-800"
+            >
+              Create a Lease Agreement
+            </Link>
+            <Link
+              href="/eviction"
+              className="block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-sm font-medium text-slate-900 hover:bg-slate-50"
+            >
+              Start Eviction Process
+            </Link>
+            <div className="pt-1">
+              <Link href="/dashboard" className="text-xs font-medium text-slate-600 underline hover:text-slate-800">
+                Landlord Dashboard
+              </Link>
+            </div>
+          </div>
+        </div>
 
-        <Link
-          href="/generate-lease"
-          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-slate-900 text-base font-medium"
-        >
-          Generate a Lease (step-by-step)
-        </Link>
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">For tenants</h2>
+          <p className="text-sm text-slate-600">
+            Apply for a rental, check your status, or report a maintenance issue.
+          </p>
+          <div className="space-y-3 pt-2">
+            <Link
+              href="/apply"
+              className="block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-medium text-white hover:bg-slate-800"
+            >
+              Apply for a Rental
+            </Link>
+            <Link
+              href="/report"
+              className="block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-sm font-medium text-slate-900 hover:bg-slate-50"
+            >
+              Report a Maintenance Issue
+            </Link>
+            <div className="pt-1">
+              <Link href="/portal" className="text-xs font-medium text-slate-600 underline hover:text-slate-800">
+                Tenant Portal
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
 
-        <Link
-          href="/eviction"
-          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-slate-900 text-base font-medium"
-        >
-          Eviction notice (questionnaire)
-        </Link>
-
-        <Link
-          href="/apply"
-          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-slate-900 text-base font-medium"
-        >
-          Start Rental Application
-        </Link>
-
-        <Link
-          href="/report"
-          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-slate-900 text-base font-medium"
-        >
-          Report a problem (tenants)
-        </Link>
-
-        <Link
-          href="/dashboard"
-          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-slate-900 text-base font-medium"
-        >
-          Landlord Dashboard
-        </Link>
-
-        <Link
-          href="/portal"
-          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-slate-900 text-base font-medium"
-        >
-          Tenant Portal
-        </Link>
-
-        <Link
-          href="/pay"
-          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-slate-900 text-base font-medium"
-        >
-          Pay (rent, fees)
-        </Link>
-
-        <Link
-          href="/generateleases"
-          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-slate-900 text-base font-medium"
-        >
-          Free leases (landlords)
-        </Link>
-
-        <Link
-          href="/beginevictions"
-          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-slate-900 text-base font-medium"
-        >
-          Eviction help (landlords)
-        </Link>
-
-        <Link
-          href="/privacy"
-          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-slate-600 text-sm"
-        >
+      <footer className="mt-8 flex flex-wrap items-center gap-4 border-t border-slate-200 pt-4 text-xs text-slate-500">
+        <Link href="/privacy" className="hover:text-slate-700 underline">
           Privacy &amp; data
         </Link>
-
-        <Link
-          href="/terms"
-          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-slate-600 text-sm"
-        >
+        <Link href="/terms" className="hover:text-slate-700 underline">
           Terms of Service
         </Link>
-
-        <Link
-          href="/design-demos"
-          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-slate-600 text-sm"
-        >
-          Design examples &amp; alternatives
+        <Link href="/pay" className="hover:text-slate-700 underline">
+          Pay rent / fees
         </Link>
-      </div>
+      </footer>
     </main>
   );
 }

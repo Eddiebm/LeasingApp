@@ -51,7 +51,7 @@ type FormData = {
 };
 
 const initialForm: FormData = {
-  country: "",
+  country: "USA",
   region: "",
   state: "",
   propertyAddress: "",
@@ -97,16 +97,17 @@ function GenerateLeasePageInner() {
       return true;
     }
     if (step === 2)
+      return form.propertyAddress && form.monthlyRent && form.securityDeposit;
+    if (step === 3) return form.landlordName && form.landlordEmail;
+    if (step === 4) return form.tenantNames.some((t) => t.trim());
+    if (step === 5)
       return (
-        form.propertyAddress &&
-        form.monthlyRent &&
-        form.securityDeposit &&
         form.leaseStartDate &&
         form.leaseDuration &&
-        (form.leaseDuration !== "Custom" || !!form.customMonths)
+        (form.leaseDuration !== "Custom" || !!form.customMonths) &&
+        form.petsAllowed &&
+        form.smokingAllowed
       );
-    if (step === 3) return form.landlordName && form.landlordAddress;
-    if (step === 4) return form.tenantNames.some((t) => t.trim());
     return true;
   }, [step, form]);
 
@@ -356,19 +357,6 @@ function GenerateLeasePageInner() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Furnished</label>
-                <select
-                  value={form.furnished}
-                  onChange={(e) => setForm((f) => ({ ...f, furnished: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                >
-                  <option value="">Select</option>
-                  {FURNISHED_OPTIONS.map((o) => (
-                    <option key={o} value={o}>{o}</option>
-                  ))}
-                </select>
-              </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Monthly rent ({currency})</label>
@@ -397,68 +385,24 @@ function GenerateLeasePageInner() {
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Lease start date</label>
-                  <input
-                    type="date"
-                    value={form.leaseStartDate}
-                    onChange={(e) => setForm((f) => ({ ...f, leaseStartDate: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                  />
+              <details className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                <summary className="cursor-pointer font-medium">Advanced options</summary>
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Furnished?</label>
+                    <select
+                      value={form.furnished}
+                      onChange={(e) => setForm((f) => ({ ...f, furnished: e.target.value }))}
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                    >
+                      <option value="">Select</option>
+                      {FURNISHED_OPTIONS.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Lease duration</label>
-                  <select
-                    value={form.leaseDuration}
-                    onChange={(e) => setForm((f) => ({ ...f, leaseDuration: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                  >
-                    <option value="">Select</option>
-                    {LEASE_DURATIONS.map((o) => (
-                      <option key={o} value={o}>{o}</option>
-                    ))}
-                  </select>
-                  {form.leaseDuration === "Custom" && (
-                    <input
-                      type="number"
-                      min="1"
-                      placeholder="Months"
-                      value={form.customMonths}
-                      onChange={(e) => setForm((f) => ({ ...f, customMonths: e.target.value }))}
-                      className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2"
-                    />
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Pets allowed</label>
-                  <select
-                    value={form.petsAllowed}
-                    onChange={(e) => setForm((f) => ({ ...f, petsAllowed: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                  >
-                    <option value="">Select</option>
-                    {PETS_OPTIONS.map((o) => (
-                      <option key={o} value={o}>{o}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Smoking allowed</label>
-                  <select
-                    value={form.smokingAllowed}
-                    onChange={(e) => setForm((f) => ({ ...f, smokingAllowed: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                  >
-                    <option value="">Select</option>
-                    {SMOKING_OPTIONS.map((o) => (
-                      <option key={o} value={o}>{o}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              </details>
             </div>
           )}
 
@@ -475,15 +419,6 @@ function GenerateLeasePageInner() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700">Landlord address</label>
-                <input
-                  type="text"
-                  value={form.landlordAddress}
-                  onChange={(e) => setForm((f) => ({ ...f, landlordAddress: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                />
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-slate-700">Landlord email</label>
                 <input
                   type="email"
@@ -492,15 +427,29 @@ function GenerateLeasePageInner() {
                   className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Landlord phone</label>
-                <input
-                  type="tel"
-                  value={form.landlordPhone}
-                  onChange={(e) => setForm((f) => ({ ...f, landlordPhone: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                />
-              </div>
+              <details className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                <summary className="cursor-pointer font-medium">Advanced options</summary>
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Mailing address (optional)</label>
+                    <input
+                      type="text"
+                      value={form.landlordAddress}
+                      onChange={(e) => setForm((f) => ({ ...f, landlordAddress: e.target.value }))}
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Phone (optional)</label>
+                    <input
+                      type="tel"
+                      value={form.landlordPhone}
+                      onChange={(e) => setForm((f) => ({ ...f, landlordPhone: e.target.value }))}
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                    />
+                  </div>
+                </div>
+              </details>
             </div>
           )}
 
@@ -559,19 +508,84 @@ function GenerateLeasePageInner() {
 
           {step === 5 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-slate-800">Special clauses (optional)</h2>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  Any additional terms or clauses?
-                </label>
-                <textarea
-                  value={form.specialClauses}
-                  onChange={(e) => setForm((f) => ({ ...f, specialClauses: e.target.value }))}
-                  placeholder="e.g. Tenant responsible for garden, no subletting, parking space included"
-                  rows={4}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                />
+              <h2 className="text-lg font-semibold text-slate-800">Lease terms</h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Lease start date</label>
+                  <input
+                    type="date"
+                    value={form.leaseStartDate}
+                    onChange={(e) => setForm((f) => ({ ...f, leaseStartDate: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Lease duration</label>
+                  <select
+                    value={form.leaseDuration}
+                    onChange={(e) => setForm((f) => ({ ...f, leaseDuration: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  >
+                    <option value="">Select</option>
+                    {LEASE_DURATIONS.map((o) => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
+                  {form.leaseDuration === "Custom" && (
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Months"
+                      value={form.customMonths}
+                      onChange={(e) => setForm((f) => ({ ...f, customMonths: e.target.value }))}
+                      className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2"
+                    />
+                  )}
+                </div>
               </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Pets allowed?</label>
+                  <select
+                    value={form.petsAllowed}
+                    onChange={(e) => setForm((f) => ({ ...f, petsAllowed: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  >
+                    <option value="">Select</option>
+                    {PETS_OPTIONS.map((o) => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Smoking allowed?</label>
+                  <select
+                    value={form.smokingAllowed}
+                    onChange={(e) => setForm((f) => ({ ...f, smokingAllowed: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  >
+                    <option value="">Select</option>
+                    {SMOKING_OPTIONS.map((o) => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <details className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                <summary className="cursor-pointer font-medium">Additional clauses (optional)</summary>
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Any extra terms you want to add?
+                  </label>
+                  <textarea
+                    value={form.specialClauses}
+                    onChange={(e) => setForm((f) => ({ ...f, specialClauses: e.target.value }))}
+                    placeholder="e.g. Tenant responsible for yard care, no subletting, parking space included"
+                    rows={4}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  />
+                </div>
+              </details>
             </div>
           )}
 

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
-export default function BeginEvictionsPage() {
+export default function Page() {
   redirect("/eviction");
 }
+
