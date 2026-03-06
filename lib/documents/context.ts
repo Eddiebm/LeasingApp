@@ -23,6 +23,10 @@ export type DocumentContext = {
   deductions?: { reason: string; amount: number }[];
   /** Document date (default today) */
   date?: string;
+  /** State code (e.g. "CA", "TX") for state-specific / AI-generated legal language */
+  stateCode?: string;
+  /** If true and stateCode + API key set, use AI to generate state-specific document body */
+  useAi?: boolean;
 };
 
 export function formatDate(s: string | undefined): string {

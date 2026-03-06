@@ -36,6 +36,93 @@ type MaintenanceRequest = {
 
 type LandlordProfile = { company_name: string | null; slug: string | null };
 
+const CSV_TEMPLATE_HEADERS = ["address", "city", "state", "zip", "rent", "status", "application_deadline"] as const;
+const CSV_TEMPLATE_SAMPLE = "123 Main St,Springfield,IL,62701,1200,active,";
+
+function downloadCsvTemplate() {
+  const header = CSV_TEMPLATE_HEADERS.join(",");
+  const csv = [header, CSV_TEMPLATE_SAMPLE].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "properties-template.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+type ParsedCsvRow = {
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  rent: string;
+  status: string;
+  application_deadline: string;
+};
+
+function parseCsvFile(text: string): ParsedCsvRow[] {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return [];
+  const header = lines[0].split(",").map((h) => h.trim().toLowerCase());
+  const getIdx = (name: string) => header.indexOf(name);
+  const addrIdx = getIdx("address");
+  const cityIdx = getIdx("city");
+  const stateIdx = getIdx("state");
+  const zipIdx = getIdx("zip");
+  const rentIdx = getIdx("rent");
+  const statusIdx = getIdx("status");
+  const appDeadlineIdx = getIdx("application_deadline");
+  const useOrder =
+    addrIdx === -1 && cityIdx === -1 && stateIdx === -1 && zipIdx === -1 && rentIdx === -1;
+  const rows: ParsedCsvRow[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = lines[i].split(",").map((c) => c.trim());
+    const get = (idx: number) => (idx >= 0 && idx < cells.length ? cells[idx] ?? "" : "");
+    if (useOrder && cells.length >= 5) {
+      rows.push({
+        address: (cells[0] ?? "").trim(),
+        city: (cells[1] ?? "").trim(),
+        state: (cells[2] ?? "").trim(),
+        zip: (cells[3] ?? "").trim(),
+        rent: (cells[4] ?? "").trim(),
+        status: (cells[5] ?? "").trim(),
+        application_deadline: (cells[6] ?? "").trim(),
+      });
+    } else if (addrIdx >= 0 && cityIdx >= 0 && stateIdx >= 0 && zipIdx >= 0 && rentIdx >= 0) {
+      rows.push({
+        address: get(addrIdx).trim(),
+        city: get(cityIdx).trim(),
+        state: get(stateIdx).trim(),
+        zip: get(zipIdx).trim(),
+        rent: get(rentIdx).trim(),
+        status: statusIdx >= 0 ? get(statusIdx).trim() : "",
+        application_deadline: appDeadlineIdx >= 0 ? get(appDeadlineIdx).trim() : "",
+      });
+    }
+  }
+  return rows;
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function validateCsvRow(row: ParsedCsvRow, index: number): string | null {
+  if (!row.address.trim()) return `Row ${index + 1}: address is required.`;
+  if (!row.city.trim()) return `Row ${index + 1}: city is required.`;
+  if (!row.state.trim()) return `Row ${index + 1}: state is required.`;
+  if (!row.zip.trim()) return `Row ${index + 1}: zip is required.`;
+  const rent = parseFloat(String(row.rent).replace(/[^0-9.]/g, ""));
+  if (Number.isNaN(rent) || rent < 0) return `Row ${index + 1}: rent must be a valid number.`;
+  const status = (row.status || "active").trim().toLowerCase();
+  if (status && status !== "active" && status !== "inactive") {
+    return `Row ${index + 1}: status must be "active" or "inactive".`;
+  }
+  if (row.application_deadline.trim() && !ISO_DATE.test(row.application_deadline.trim())) {
+    return `Row ${index + 1}: application_deadline must be YYYY-MM-DD.`;
+  }
+  return null;
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [session, setSession] = useState<{ access_token: string; user?: { email?: string } } | null>(null);
@@ -57,6 +144,11 @@ export default function Dashboard() {
     zip: "",
     rent: ""
   });
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
+  const [csvRows, setCsvRows] = useState<ParsedCsvRow[]>([]);
+  const [csvRowErrors, setCsvRowErrors] = useState<(string | null)[]>([]);
+  const [csvUploadError, setCsvUploadError] = useState<string | null>(null);
+  const [csvUploading, setCsvUploading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -208,6 +300,73 @@ export default function Dashboard() {
     }
   };
 
+  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setCsvUploadError(null);
+    if (!file) {
+      setCsvRows([]);
+      setCsvRowErrors([]);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? "");
+      const rows = parseCsvFile(text);
+      setCsvRows(rows);
+      const errs = rows.map((r, i) => validateCsvRow(r, i));
+      setCsvRowErrors(errs);
+    };
+    reader.readAsText(file, "UTF-8");
+  };
+
+  const handleCsvUploadAll = async () => {
+    const validRows = csvRows.filter((_, i) => !csvRowErrors[i]);
+    if (validRows.length === 0) {
+      setCsvUploadError("No valid rows to upload. Fix errors in the table and try again.");
+      return;
+    }
+    setCsvUploadError(null);
+    setCsvUploading(true);
+    try {
+      const properties = validRows.map((r) => {
+        const statusRaw = (r.status || "active").trim().toLowerCase();
+        const status = statusRaw === "inactive" ? "inactive" : "active";
+        const appDeadline = r.application_deadline.trim();
+        return {
+          address: r.address.trim(),
+          city: r.city.trim(),
+          state: r.state.trim(),
+          zip: r.zip.trim(),
+          rent: parseFloat(String(r.rent).replace(/[^0-9.]/g, "")),
+          status,
+          application_deadline: appDeadline && ISO_DATE.test(appDeadline) ? appDeadline : undefined,
+        };
+      });
+      const res = await fetch("/api/properties/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ properties }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = Array.isArray(data.errors) ? data.errors.join(" ") : data.error || "Upload failed.";
+        setCsvUploadError(msg);
+        return;
+      }
+      setCsvModalOpen(false);
+      setCsvRows([]);
+      setCsvRowErrors([]);
+      await fetchProperties();
+    } catch (err) {
+      console.error(err);
+      setCsvUploadError("Network error. Please try again.");
+    } finally {
+      setCsvUploading(false);
+    }
+  };
+
+  const csvValidCount = csvRows.length - csvRowErrors.filter(Boolean).length;
+
   const dashboardTitle = landlord?.company_name ? `${landlord.company_name} – Leasing` : "Leasing Dashboard";
 
   return (
@@ -264,7 +423,21 @@ export default function Dashboard() {
       )}
 
       <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-800">Add a property</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-800">Add a property</h2>
+          <button
+            type="button"
+            onClick={() => {
+              setCsvModalOpen(true);
+              setCsvUploadError(null);
+              setCsvRows([]);
+              setCsvRowErrors([]);
+            }}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Upload Properties (CSV)
+          </button>
+        </div>
         <form onSubmit={handleCreateProperty} className="mt-2 grid gap-2 md:grid-cols-5">
           <input
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
@@ -382,6 +555,113 @@ export default function Dashboard() {
           </div>
         )}
       </section>
+
+      {csvModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="csv-modal-title">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="border-b border-slate-200 p-4">
+              <h2 id="csv-modal-title" className="text-lg font-semibold text-slate-800">Upload properties from CSV</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Use a CSV with columns: <strong>address</strong>, <strong>city</strong>, <strong>state</strong>, <strong>zip</strong>, <strong>rent</strong>, <strong>status</strong> (active or inactive), <strong>application_deadline</strong> (optional, YYYY-MM-DD).
+              </p>
+            </div>
+            <div className="overflow-y-auto p-4 space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="cursor-pointer rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                  Choose CSV file
+                  <input
+                    type="file"
+                    accept=".csv"
+                    className="sr-only"
+                    onChange={handleCsvFileChange}
+                  />
+                </label>
+                <a
+                  href="#"
+                  onClick={(e) => { e.preventDefault(); downloadCsvTemplate(); }}
+                  className="text-sm font-medium text-blue-600 hover:underline"
+                >
+                  Download CSV Template
+                </a>
+              </div>
+              {csvUploadError && (
+                <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800">
+                  {csvUploadError}
+                </div>
+              )}
+              {csvRows.length > 0 && (
+                <>
+                  <div className="text-sm font-medium text-slate-700">
+                    {csvValidCount > 0
+                      ? `${csvValidCount} propert${csvValidCount === 1 ? "y" : "ies"} ready to upload`
+                      : `Preview (${csvRows.length} row${csvRows.length !== 1 ? "s" : ""})`}
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50">
+                          <th className="px-3 py-2 text-left font-medium text-slate-700">#</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-700">Address</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-700">City</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-700">State</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-700">ZIP</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-700">Rent</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-700">Status</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-700">App deadline</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-700">Error</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {csvRows.map((row, i) => (
+                          <tr
+                            key={i}
+                            className={`border-b border-slate-100 ${csvRowErrors[i] ? "bg-red-50/50" : ""}`}
+                          >
+                            <td className="px-3 py-2 text-slate-600">{i + 1}</td>
+                            <td className="px-3 py-2">{row.address}</td>
+                            <td className="px-3 py-2">{row.city}</td>
+                            <td className="px-3 py-2">{row.state}</td>
+                            <td className="px-3 py-2">{row.zip}</td>
+                            <td className="px-3 py-2">{row.rent}</td>
+                            <td className="px-3 py-2">{row.status || "active"}</td>
+                            <td className="px-3 py-2">{row.application_deadline || "—"}</td>
+                            <td className="px-3 py-2 text-red-600">{csvRowErrors[i] ?? "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Rows with errors are highlighted. Only valid rows will be uploaded when you click Upload All.
+                  </p>
+                </>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 p-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setCsvModalOpen(false);
+                  setCsvUploadError(null);
+                  setCsvRows([]);
+                  setCsvRowErrors([]);
+                }}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCsvUploadAll}
+                disabled={csvRows.length === 0 || csvRowErrors.every((e) => e !== null) || csvUploading}
+                className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {csvUploading ? "Uploading…" : "Upload All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

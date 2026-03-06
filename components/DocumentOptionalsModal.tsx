@@ -55,6 +55,10 @@ export default function DocumentOptionalsModal({
           return { reason, amount };
         });
     }
+    if (payload.stateCode != null && String(payload.stateCode).trim().length >= 2) {
+      out.stateCode = String(payload.stateCode).trim().substring(0, 2).toUpperCase();
+    }
+    if (payload.useAi === true) out.useAi = true;
     onConfirm(out);
   };
 
@@ -198,6 +202,34 @@ export default function DocumentOptionalsModal({
                 value={deductionLines}
                 onChange={(e) => setDeductionLines(e.target.value)}
               />
+            </div>
+          )}
+          {fields.includes("stateCode") && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">State (2-letter code)</label>
+              <input
+                type="text"
+                maxLength={2}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm min-h-[48px] uppercase"
+                placeholder="e.g. CA, TX, NY"
+                value={(payload.stateCode as string) ?? ""}
+                onChange={(e) => setPayload((p) => ({ ...p, stateCode: e.target.value.toUpperCase() }))}
+              />
+              <p className="mt-1 text-xs text-slate-500">For state-specific legal language when using AI.</p>
+            </div>
+          )}
+          {fields.includes("useAi") && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="useAi"
+                className="h-4 w-4 rounded border-slate-300"
+                checked={payload.useAi === true}
+                onChange={(e) => setPayload((p) => ({ ...p, useAi: e.target.checked }))}
+              />
+              <label htmlFor="useAi" className="text-sm font-medium text-slate-700">
+                Use AI for state-specific language
+              </label>
             </div>
           )}
 

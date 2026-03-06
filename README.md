@@ -19,6 +19,10 @@ Rental agency platform for **Bannerman Group**: tenants submit applications, upl
 - **PDFs:** pdf-lib
 - **Hosting:** Cloudflare Pages
 
+## Go live
+
+**Ready to launch?** Use the step-by-step checklist: **[docs/GO-LIVE.md](./docs/GO-LIVE.md)** (DB migrations, first admin, Stripe webhook, env vars, deploy, smoke test).
+
 ## Setup
 
 ### 1. Install
