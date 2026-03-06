@@ -43,6 +43,7 @@ export default function ListingManagerPage() {
   const [publishing, setPublishing] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [copyCaptionFeedback, setCopyCaptionFeedback] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
@@ -160,12 +161,36 @@ export default function ListingManagerPage() {
     }
   };
 
+  const listingUrl = listing?.listing_slug ? `${BASE_URL}/listing/${listing.listing_slug}` : null;
+
   const copyLink = async () => {
-    if (!listing?.listing_slug) return;
-    await navigator.clipboard.writeText(`${BASE_URL}/listing/${listing.listing_slug}`);
+    if (!listingUrl) return;
+    await navigator.clipboard.writeText(listingUrl);
     setCopyFeedback(true);
     setTimeout(() => setCopyFeedback(false), 2000);
   };
+
+  const copyCaption = useCallback(() => {
+    if (!listing || !listingUrl) return;
+    const beds = listing.bedrooms ? `${listing.bedrooms} bed` : "";
+    const baths = listing.bathrooms ? `${listing.bathrooms} bath` : "";
+    const bedsBaths = [beds, baths].filter(Boolean).join(" · ");
+    const price = listing.rent ? `$${listing.rent.toLocaleString()}/mo` : "";
+    const available = listing.available_from
+      ? ` · Available ${new Date(listing.available_from).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+      : "";
+    const headline = listing.listing_headline || listing.address;
+    const caption = [
+      `🏠 ${headline}`,
+      [price, bedsBaths].filter(Boolean).join(" · ") + available,
+      "",
+      "Apply here 👇",
+      listingUrl,
+    ].join("\n");
+    navigator.clipboard.writeText(caption);
+    setCopyCaptionFeedback(true);
+    setTimeout(() => setCopyCaptionFeedback(false), 2500);
+  }, [listing, listingUrl]);
 
   const downloadSocialCard = () => {
     window.open(`/api/properties/${propertyId}/social-card`, "_blank");
@@ -190,9 +215,14 @@ export default function ListingManagerPage() {
     );
   }
 
-  const listingUrl = listing.listing_slug ? `${BASE_URL}/listing/${listing.listing_slug}` : null;
+  const bedsShort = listing.bedrooms ? `${listing.bedrooms}bd` : "";
+  const bathsShort = listing.bathrooms ? `${listing.bathrooms}ba` : "";
+  const bedsBathsShort = [bedsShort, bathsShort].filter(Boolean).join("/");
+  const availShort = listing.available_from
+    ? ` · avail ${new Date(listing.available_from).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+    : "";
   const shareText = encodeURIComponent(
-    `${listing.listing_headline ?? listing.address} — $${listing.rent?.toLocaleString() ?? "?"}/mo. Apply now:`
+    `🏠 ${listing.listing_headline ?? listing.address} — $${listing.rent?.toLocaleString() ?? "?"}/mo${bedsBathsShort ? ` · ${bedsBathsShort}` : ""}${availShort}. Apply:`
   );
 
   return (
@@ -354,11 +384,27 @@ export default function ListingManagerPage() {
               <button
                 type="button"
                 onClick={copyLink}
-                className="shrink-0 rounded-lg bg-black px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
-                {copyFeedback ? "Copied!" : "Copy"}
+                {copyFeedback ? "Copied!" : "Copy link"}
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={copyCaption}
+              className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left hover:bg-slate-100 transition-colors"
+            >
+              <div>
+                <p className="text-sm font-medium text-slate-800">
+                  {copyCaptionFeedback ? "✓ Copied to clipboard!" : "Copy post caption"}
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Ready-made message with price, beds, and link — paste into WhatsApp, iMessage, or TikTok
+                </p>
+              </div>
+              <span className="shrink-0 text-lg">📋</span>
+            </button>
 
             {/* Social share buttons */}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

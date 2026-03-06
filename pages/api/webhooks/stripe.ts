@@ -69,7 +69,7 @@ export default async function handler(req: Request) {
     type: string;
     data?: {
       object?: {
-        metadata?: { paymentId?: string };
+        metadata?: { paymentId?: string; rentPaymentId?: string };
         customer?: string;
         status?: string;
         current_period_end?: number;
@@ -83,6 +83,95 @@ export default async function handler(req: Request) {
   }
 
   const db = getAdminClient();
+  const env = getEnv();
+
+  if (event.type === "payment_intent.succeeded") {
+    const obj = event.data?.object as { metadata?: { rentPaymentId?: string; paymentId?: string } };
+    const rentPaymentId = obj?.metadata?.rentPaymentId;
+    if (rentPaymentId) {
+      const now = new Date().toISOString();
+      await db.from("rent_payments").update({ status: "succeeded", paid_at: now }).eq("id", rentPaymentId);
+
+      const { data: rp } = await db
+        .from("rent_payments")
+        .select(`
+          amount_cents,
+          late_fee_cents,
+          currency,
+          period_start,
+          period_end,
+          landlord_id,
+          tenants ( first_name, last_name, email ),
+          properties ( address, city, state, zip ),
+          landlords ( email, full_name )
+        `)
+        .eq("id", rentPaymentId)
+        .single();
+
+      if (rp && env.RESEND_API_KEY) {
+        const R = rp as {
+          amount_cents: number;
+          late_fee_cents: number;
+          currency: string;
+          period_start: string | null;
+          period_end: string | null;
+          tenants: { first_name: string; last_name: string; email: string } | null;
+          properties: { address: string; city: string; state: string; zip: string } | null;
+          landlords: { email: string; full_name: string } | null;
+        };
+        const totalCents = R.amount_cents + (R.late_fee_cents ?? 0);
+        const amountFormatted = new Intl.NumberFormat("en-US", { style: "currency", currency: (R.currency || "usd").toUpperCase() }).format(totalCents / 100);
+        const period = R.period_start && R.period_end
+          ? new Date(R.period_start).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+          : "";
+        const propertyAddress = R.properties ? `${R.properties.address}, ${R.properties.city}, ${R.properties.state} ${R.properties.zip}` : "";
+        const tenantName = R.tenants ? `${R.tenants.first_name} ${R.tenants.last_name}`.trim() : "";
+        const tenantEmail = R.tenants?.email;
+        const landlordEmail = R.landlords?.email;
+        const landlordName = R.landlords?.full_name ?? "Landlord";
+        const emailOpts = { resendApiKey: env.RESEND_API_KEY, from: env.EMAIL_FROM ?? "Leasing <onboarding@resend.dev>" };
+        const { sendRentReceiptEmail, sendRentPaidNotificationEmail } = await import("../../../lib/email");
+        if (tenantEmail) sendRentReceiptEmail(tenantEmail, tenantName, amountFormatted, period, propertyAddress, now, emailOpts).catch(console.error);
+        if (landlordEmail) sendRentPaidNotificationEmail(landlordEmail, tenantName, amountFormatted, period, propertyAddress, emailOpts).catch(console.error);
+      }
+    }
+  }
+
+  if (event.type === "payment_intent.payment_failed") {
+    const obj = event.data?.object as { metadata?: { rentPaymentId?: string } };
+    const rentPaymentId = obj?.metadata?.rentPaymentId;
+    if (rentPaymentId) {
+      await db.from("rent_payments").update({ status: "failed" }).eq("id", rentPaymentId);
+      const { data: rp } = await db
+        .from("rent_payments")
+        .select("tenants ( first_name, last_name, email ), properties ( address, city, state, zip ), landlords ( email )")
+        .eq("id", rentPaymentId)
+        .single();
+      if (rp && env.RESEND_API_KEY) {
+        const R = rp as {
+          tenants: { first_name: string; last_name: string; email: string } | null;
+          properties: { address: string; city: string; state: string; zip: string } | null;
+          landlords: { email: string } | null;
+        };
+        const tenantEmail = R.tenants?.email;
+        const landlordEmail = R.landlords?.email;
+        const tenantName = R.tenants ? `${R.tenants.first_name} ${R.tenants.last_name}`.trim() : "";
+        const propertyAddress = R.properties ? `${R.properties.address}, ${R.properties.city}, ${R.properties.state} ${R.properties.zip}` : "";
+        const emailOpts = { resendApiKey: env.RESEND_API_KEY, from: env.EMAIL_FROM ?? "Leasing <onboarding@resend.dev>" };
+        const { sendLatePaymentLandlordAlertEmail } = await import("../../../lib/email");
+        if (tenantEmail) {
+          const resend = await import("resend").then((m) => new m.Resend(env.RESEND_API_KEY));
+          resend.emails.send({
+            from: env.EMAIL_FROM ?? "Leasing <onboarding@resend.dev>",
+            to: [tenantEmail],
+            subject: `Payment failed — ${propertyAddress}`,
+            html: `<p>Hi ${tenantName},</p><p>Your recent rent payment attempt for ${propertyAddress} did not succeed. Please try again or use a different payment method.</p>`
+          }).catch(console.error);
+        }
+        if (landlordEmail) sendLatePaymentLandlordAlertEmail(landlordEmail, tenantName, "—", 0, propertyAddress, emailOpts).catch(console.error);
+      }
+    }
+  }
 
   if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
     const sub = event.data?.object as { customer?: string; status?: string; current_period_end?: number } | undefined;
@@ -109,7 +198,8 @@ export default async function handler(req: Request) {
   }
 
   if (event.type === "payment_intent.succeeded") {
-    const paymentId = event.data?.object?.metadata?.paymentId;
+    const obj = event.data?.object as { metadata?: { paymentId?: string } };
+    const paymentId = obj?.metadata?.paymentId;
     if (paymentId) {
       await db
         .from("payments")

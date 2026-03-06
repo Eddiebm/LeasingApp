@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { getSupabaseServer } from "../../../lib/supabaseServer";
+import { ListingShareRow } from "../../../components/ListingShareRow";
 
 export const runtime = "edge";
 
@@ -50,21 +51,24 @@ export async function generateMetadata({ params }: PageParams) {
   const title = property.listing_headline || property.address || "Rental listing";
   const description = `${property.bedrooms ?? ""}bd/${property.bathrooms ?? ""}ba · $${property.rent ?? ""}/mo · ${property.address ?? ""}`;
 
+  const BASE = "https://leasingapp.pages.dev";
+  const socialCardUrl = `${BASE}/api/properties/${property.id}/social-card`;
+
   return {
     title: `${title} — Bannerman Leasing`,
     description,
     openGraph: {
       title,
       description,
-      images: property.listing_photo_url
-        ? [{ url: property.listing_photo_url, width: 1200, height: 630 }]
-        : [],
+      images: [{ url: socialCardUrl, width: 1080, height: 1080, alt: title }],
       type: "website",
+      siteName: "Bannerman Leasing",
     },
     twitter: {
       card: "summary_large_image",
       title,
-      images: property.listing_photo_url ? [property.listing_photo_url] : [],
+      description,
+      images: [socialCardUrl],
     },
   };
 }
@@ -138,14 +142,24 @@ export default async function ListingPage({ params }: PageParams) {
         <p className="whitespace-pre-line text-sm text-slate-700">{property.listing_description}</p>
       )}
 
-      <div className="pt-2">
+      <div className="space-y-4 pt-2">
         <Link
           href={applyHref}
           className="inline-flex items-center rounded-xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800"
         >
           Apply Now
         </Link>
+        <ListingShareRow
+          listingUrl={`https://leasingapp.pages.dev/listing/${params.slug}`}
+          headline={property.listing_headline || addressLine || "Rental listing"}
+          price={price}
+          bedsBaths={bedsBaths}
+          availableFrom={property.available_from}
+          propertyId={property.id}
+        />
       </div>
+      {/* Fallback image hint for scrapers that don't read OG tags */}
+      <link rel="image_src" href={`https://leasingapp.pages.dev/api/properties/${property.id}/social-card`} />
     </main>
   );
 }

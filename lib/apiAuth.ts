@@ -14,6 +14,10 @@ export type LandlordRow = {
   stripe_customer_id?: string | null;
   subscription_status?: string | null;
   subscription_current_period_end?: string | null;
+  stripe_connect_account_id?: string | null;
+  stripe_connect_onboarded?: boolean | null;
+  stripe_connect_charges_enabled?: boolean | null;
+  stripe_connect_payouts_enabled?: boolean | null;
 };
 
 export type AuthResult =
@@ -53,7 +57,7 @@ export async function getLandlordOrAdmin(req: {
 
   const [{ data: roleRow }, { data: landlordRows }] = await Promise.all([
     getSupabaseServer().from("user_roles").select("role").eq("user_id", user.id).maybeSingle(),
-    getSupabaseServer().from("landlords").select("id, user_id, full_name, company_name, email, phone, slug, stripe_customer_id, subscription_status, subscription_current_period_end").eq("user_id", user.id).maybeSingle(),
+    getSupabaseServer().from("landlords").select("id, user_id, full_name, company_name, email, phone, slug, stripe_customer_id, subscription_status, subscription_current_period_end, country, stripe_connect_account_id, stripe_connect_onboarded, stripe_connect_charges_enabled, stripe_connect_payouts_enabled").eq("user_id", user.id).maybeSingle(),
   ]);
 
   const role = roleRow?.role;

@@ -75,9 +75,20 @@ async function callOpenAI(
     const err = await res.text();
     throw new Error(`OpenAI API error: ${res.status} ${err}`);
   }
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  const data = (await res.json()) as {
+    choices?: { message?: { content?: string } }[];
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+  };
   const text = data.choices?.[0]?.message?.content?.trim();
   if (!text) throw new Error("Empty response from OpenAI");
+  if (data.usage) {
+    try {
+      const { logAiUsage } = await import("../aiUsageLog");
+      logAiUsage("aiGenerate", "gpt-4o-mini", data.usage);
+    } catch {
+      /* ignore */
+    }
+  }
   return text;
 }
 

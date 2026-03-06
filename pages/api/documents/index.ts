@@ -18,7 +18,7 @@ export default async function handler(req: Request) {
 
   const { data, error } = await supabase
     .from("documents")
-    .select("id, type, file_url, created_at")
+    .select("id, type, file_url, created_at, signing_token_expires_at, signed_at, signed_by_name, signed_pdf_url, tenant_email")
     .eq("application_id", applicationId)
     .order("created_at", { ascending: false });
 

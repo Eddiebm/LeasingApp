@@ -85,8 +85,15 @@ export default async function handler(req: Request) {
       return json({ error: "AI service error. Please try again." }, 502);
     }
 
-    const data = (await response.json()) as { choices?: { message?: { content?: string } }[] };
+    const data = (await response.json()) as {
+      choices?: { message?: { content?: string } }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+    };
     const rawLease = data.choices?.[0]?.message?.content?.trim();
+    if (data.usage) {
+      const { logAiUsage } = await import("../../../lib/aiUsageLog");
+      logAiUsage("generate_lease", "gpt-4o-mini", data.usage);
+    }
     if (!rawLease) return json({ error: "Empty response from AI. Please try again." }, 502);
 
     const fullLeaseText = DISCLAIMER + rawLease;

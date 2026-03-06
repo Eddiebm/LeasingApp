@@ -77,8 +77,15 @@ export default async function handler(req: Req) {
     );
   }
 
-  const result = (await response.json()) as { choices?: { message?: { content?: string } }[] };
+  const result = (await response.json()) as {
+    choices?: { message?: { content?: string } }[];
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+  };
   const documentText = result.choices?.[0]?.message?.content?.trim() ?? "";
+  if (result.usage) {
+    const { logAiUsage } = await import("../../../lib/aiUsageLog");
+    logAiUsage("documents_generate", "gpt-4o-mini", result.usage);
+  }
   if (!documentText) {
     return new Response(JSON.stringify({ error: "Empty document." }), {
       status: 502,

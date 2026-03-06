@@ -31,11 +31,12 @@ export default function HomePage() {
             >
               Start Eviction Process
             </Link>
-            <div className="pt-1">
-              <Link href="/dashboard" className="text-xs font-medium text-slate-600 underline hover:text-slate-800">
-                Landlord Dashboard
-              </Link>
-            </div>
+            <Link
+              href="/dashboard"
+              className="block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-sm font-medium text-slate-900 hover:bg-slate-50 min-h-[48px] flex items-center justify-center"
+            >
+              Landlord Dashboard
+            </Link>
           </div>
         </div>
 
@@ -57,23 +58,24 @@ export default function HomePage() {
             >
               Report a Maintenance Issue
             </Link>
-            <div className="pt-1">
-              <Link href="/portal" className="text-xs font-medium text-slate-600 underline hover:text-slate-800">
-                Tenant Portal
-              </Link>
-            </div>
+            <Link
+              href="/portal"
+              className="block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-sm font-medium text-slate-900 hover:bg-slate-50 min-h-[48px] flex items-center justify-center"
+            >
+              Tenant Portal
+            </Link>
           </div>
         </div>
       </section>
 
       <footer className="mt-8 flex flex-wrap items-center gap-4 border-t border-slate-200 pt-4 text-xs text-slate-500">
-        <Link href="/privacy" className="hover:text-slate-700 underline">
+        <Link href="/privacy" className="hover:text-slate-700 underline py-3 px-3">
           Privacy &amp; data
         </Link>
-        <Link href="/terms" className="hover:text-slate-700 underline">
+        <Link href="/terms" className="hover:text-slate-700 underline py-3 px-3">
           Terms of Service
         </Link>
-        <Link href="/pay" className="hover:text-slate-700 underline">
+        <Link href="/pay" className="hover:text-slate-700 underline py-3 px-3">
           Pay rent / fees
         </Link>
       </footer>

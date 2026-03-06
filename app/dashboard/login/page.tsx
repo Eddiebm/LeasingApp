@@ -1,16 +1,25 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase, isSupabaseConfigured } from "../../../lib/supabaseClient";
 
-export default function DashboardLoginPage() {
+function DashboardLoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  useEffect(() => {
+    if (searchParams.get("reset") === "success") {
+      setSuccessMessage("Password updated. You can sign in now.");
+      router.replace("/dashboard/login", { scroll: false });
+    }
+  }, [searchParams, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +48,9 @@ export default function DashboardLoginPage() {
         Sign in to manage your properties, applications, and leases.
       </p>
       <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
+        {successMessage && (
+          <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800" role="status">{successMessage}</p>
+        )}
         {error && (
           <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700" role="alert">{error}</p>
         )}
@@ -55,7 +67,12 @@ export default function DashboardLoginPage() {
           />
         </div>
         <div>
-          <label htmlFor="login-password" className="mb-1 block text-sm font-medium text-slate-700">Password</label>
+          <div className="mb-1 flex items-center justify-between">
+            <label htmlFor="login-password" className="block text-sm font-medium text-slate-700">Password</label>
+            <Link href="/dashboard/forgot-password" className="text-xs font-medium text-slate-600 underline hover:no-underline">
+              Forgot password?
+            </Link>
+          </div>
           <input
             id="login-password"
             type="password"
@@ -76,11 +93,19 @@ export default function DashboardLoginPage() {
       </form>
       <p className="text-center text-sm text-slate-600">
         Don&apos;t have an account?{" "}
-        <Link href="/dashboard/signup" className="font-medium underline">
+        <Link href="/dashboard/signup" className="font-medium underline py-2 px-2">
           Sign up
         </Link>
       </p>
-      <Link href="/" className="block text-center text-sm underline text-slate-600">Back to home</Link>
+      <Link href="/" className="block text-center text-sm underline text-slate-600 py-3 px-3">← Back to home</Link>
     </main>
+  );
+}
+
+export default function DashboardLoginPage() {
+  return (
+    <Suspense fallback={<main className="space-y-6"><p className="text-slate-500">Loading…</p></main>}>
+      <DashboardLoginForm />
+    </Suspense>
   );
 }

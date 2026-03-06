@@ -12,6 +12,10 @@ type LandlordBilling = {
   stripe_customer_id?: string | null;
   subscription_status?: string | null;
   subscription_current_period_end?: string | null;
+  stripe_connect_account_id?: string | null;
+  stripe_connect_onboarded?: boolean | null;
+  stripe_connect_charges_enabled?: boolean | null;
+  stripe_connect_payouts_enabled?: boolean | null;
 };
 
 export default function BillingPage() {
@@ -23,6 +27,8 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<"gbp" | "usd" | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [connectLoading, setConnectLoading] = useState(false);
+  const [connectStatus, setConnectStatus] = useState<{ chargesEnabled: boolean; payoutsEnabled: boolean; onboarded: boolean } | null>(null);
   const [leasesPerYear, setLeasesPerYear] = useState<1 | 2 | 3 | 5>(1);
 
   useEffect(() => {
@@ -39,6 +45,16 @@ export default function BillingPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [session?.access_token]);
+
+  useEffect(() => {
+    if (!session?.access_token || !landlord?.stripe_connect_account_id) return;
+    fetch("/api/connect/status", { headers: { Authorization: `Bearer ${session.access_token}` } })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.chargesEnabled !== undefined) setConnectStatus({ chargesEnabled: data.chargesEnabled, payoutsEnabled: data.payoutsEnabled, onboarded: data.onboarded });
+      })
+      .catch(() => {});
+  }, [session?.access_token, landlord?.stripe_connect_account_id]);
 
   const handleSubscribe = async (currency: "gbp" | "usd") => {
     if (!session?.access_token) return;
@@ -60,6 +76,54 @@ export default function BillingPage() {
       alert("Something went wrong.");
     } finally {
       setCheckoutLoading(null);
+    }
+  };
+
+  const handleConnectBank = async () => {
+    if (!session?.access_token) return;
+    setConnectLoading(true);
+    try {
+      if (!landlord?.stripe_connect_account_id) {
+        const createRes = await fetch("/api/connect/create-account", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const createData = await createRes.json().catch(() => ({}));
+        if (!createRes.ok && createData.error?.includes("already exists")) {
+          // refresh landlord and get link
+        } else if (!createRes.ok) {
+          alert(createData.error || "Could not create account.");
+          return;
+        }
+      }
+      const linkRes = await fetch("/api/connect/onboarding-link", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      const linkData = await linkRes.json().catch(() => ({}));
+      if (linkData.url) window.location.href = linkData.url;
+      else alert(linkData.error || "Could not get onboarding link.");
+    } catch (e) {
+      console.error(e);
+      alert("Something went wrong.");
+    } finally {
+      setConnectLoading(false);
+    }
+  };
+
+  const handleStripeDashboard = async () => {
+    if (!session?.access_token) return;
+    setConnectLoading(true);
+    try {
+      const res = await fetch("/api/connect/dashboard-link", { headers: { Authorization: `Bearer ${session.access_token}` } });
+      const data = await res.json().catch(() => ({}));
+      if (data.url) window.location.href = data.url;
+      else alert(data.error || "Could not open Stripe dashboard.");
+    } catch (e) {
+      console.error(e);
+      alert("Something went wrong.");
+    } finally {
+      setConnectLoading(false);
     }
   };
 
@@ -121,6 +185,56 @@ export default function BillingPage() {
           Checkout was canceled.
         </div>
       )}
+
+      {searchParams.get("connect") === "success" && (
+        <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+          Bank account connected. You can now collect rent through the platform.
+        </div>
+      )}
+      {searchParams.get("connect") === "refresh" && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          Onboarding expired or was refreshed. You can start again below.
+        </div>
+      )}
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">Rent collection</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          To collect rent through Bannerman Leasing, connect your bank account via Stripe.
+        </p>
+        {(connectStatus?.onboarded || landlord?.stripe_connect_onboarded) ? (
+          <div className="mt-4 space-y-2">
+            <p className="text-sm font-medium text-emerald-700">✓ Bank account connected</p>
+            <p className="text-sm text-slate-600">
+              Payouts enabled · Charges enabled
+            </p>
+            <button
+              type="button"
+              onClick={handleStripeDashboard}
+              disabled={connectLoading}
+              className="mt-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {connectLoading ? "Opening…" : "View Stripe Dashboard →"}
+            </button>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-3">
+            <ul className="text-sm text-slate-700 space-y-1">
+              <li>✓ Secure — bank details handled by Stripe</li>
+              <li>✓ Takes 5–10 minutes</li>
+              <li>✓ Supports ACH and card payments</li>
+            </ul>
+            <button
+              type="button"
+              onClick={handleConnectBank}
+              disabled={connectLoading}
+              className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              {connectLoading ? "Redirecting…" : "Connect bank account"}
+            </button>
+          </div>
+        )}
+      </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
         {loading ? (

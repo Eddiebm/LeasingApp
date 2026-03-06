@@ -16,15 +16,16 @@ type Property = {
 
 type ApplicationFormProps = {
   landlordSlug?: string;
+  initialPropertyId?: string;
 };
 
-export default function ApplicationForm({ landlordSlug }: ApplicationFormProps) {
+export default function ApplicationForm({ landlordSlug, initialPropertyId }: ApplicationFormProps) {
   const [step, setStep] = useState<Step>(1);
   const [submitting, setSubmitting] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
 
   const [form, setForm] = useState({
-    propertyId: "",
+    propertyId: initialPropertyId ?? "",
     firstName: "",
     lastName: "",
     phone: "",
@@ -50,6 +51,10 @@ export default function ApplicationForm({ landlordSlug }: ApplicationFormProps) 
       .then((data) => setProperties(Array.isArray(data) ? data : []))
       .catch(() => setProperties([]));
   }, [landlordSlug]);
+
+  useEffect(() => {
+    if (initialPropertyId) setForm((f) => ({ ...f, propertyId: initialPropertyId }));
+  }, [initialPropertyId]);
 
   const next = () => setStep((s) => (s < 4 ? ((s + 1) as Step) : s));
   const back = () => setStep((s) => (s > 1 ? ((s - 1) as Step) : s));

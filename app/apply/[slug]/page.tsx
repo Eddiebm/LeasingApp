@@ -4,10 +4,12 @@ import ApplicationForm from "../../../components/ApplicationForm";
 
 type ApplyForLandlordPageProps = {
   params: { slug: string };
+  searchParams: { property?: string };
 };
 
-export default function ApplyForLandlordPage({ params }: ApplyForLandlordPageProps) {
+export default function ApplyForLandlordPage({ params, searchParams }: ApplyForLandlordPageProps) {
   const { slug } = params;
+  const propertyId = searchParams?.property;
   const displayName = slug.replace(/-/g, " ");
 
   return (
@@ -16,7 +18,7 @@ export default function ApplyForLandlordPage({ params }: ApplyForLandlordPagePro
       <p className="text-sm text-slate-600">
         Apply for a property with {displayName}.
       </p>
-      <ApplicationForm landlordSlug={slug} />
+      <ApplicationForm landlordSlug={slug} initialPropertyId={propertyId} />
     </main>
   );
 }

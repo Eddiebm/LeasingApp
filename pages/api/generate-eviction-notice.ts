@@ -70,8 +70,15 @@ export default async function handler(req: Request) {
       return json({ error: "AI service error. Please try again." }, 502);
     }
 
-    const data = (await response.json()) as { choices?: { message?: { content?: string } }[] };
+    const data = (await response.json()) as {
+      choices?: { message?: { content?: string } }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+    };
     const raw = data.choices?.[0]?.message?.content?.trim();
+    if (data.usage) {
+      const { logAiUsage } = await import("../../../lib/aiUsageLog");
+      logAiUsage("generate_eviction_notice", "gpt-4o-mini", data.usage);
+    }
     if (!raw) return json({ error: "Empty response from AI." }, 502);
 
     const jsonMatch = raw.match(/\{[\s\S]*\}/);

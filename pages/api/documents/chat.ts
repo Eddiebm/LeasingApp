@@ -87,8 +87,15 @@ export default async function handler(req: Request) {
       return json({ error: "Something went wrong. Please try again." }, 502);
     }
 
-    const chatData = (await chatRes.json()) as { choices?: { message?: { content?: string } }[] };
+    const chatData = (await chatRes.json()) as {
+      choices?: { message?: { content?: string } }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+    };
     const content = chatData.choices?.[0]?.message?.content?.trim() ?? "";
+    if (chatData.usage) {
+      const { logAiUsage } = await import("../../../lib/aiUsageLog");
+      logAiUsage("documents_chat", "gpt-4o-mini", chatData.usage);
+    }
     if (!content) return json({ error: "Empty response." }, 502);
 
     let parsed: {
@@ -138,8 +145,15 @@ export default async function handler(req: Request) {
       return json({ error: "Failed to generate document. Please try again." }, 502);
     }
 
-    const genData = (await genRes.json()) as { choices?: { message?: { content?: string } }[] };
+    const genData = (await genRes.json()) as {
+      choices?: { message?: { content?: string } }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+    };
     const documentText = genData.choices?.[0]?.message?.content?.trim() ?? "";
+    if (genData.usage) {
+      const { logAiUsage } = await import("../../../lib/aiUsageLog");
+      logAiUsage("documents_chat_gen", "gpt-4o-mini", genData.usage);
+    }
     if (!documentText) return json({ error: "Empty document." }, 502);
 
     const docLabel =

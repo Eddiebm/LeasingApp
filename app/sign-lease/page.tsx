@@ -1,121 +1,85 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-type LeaseInfo = {
-  applicationId: string;
+type ValidateResponse = {
+  valid: boolean;
+  expired: boolean;
+  alreadySigned: boolean;
+  signedAt?: string | null;
   tenantName: string;
   propertyAddress: string;
-  rent: number | null;
-  leasePdfUrl: string | null;
-  signed: boolean;
-  signedAt: string | null;
-  signedPdfUrl: string | null;
+  leaseContent: string;
+  leasePdfUrl: string;
 };
 
 function SignLeaseContent() {
   const searchParams = useSearchParams();
-  const applicationId = searchParams.get("applicationId");
-  const email = searchParams.get("email");
-  const token = searchParams.get("token");
+  const token = searchParams.get("token") ?? "";
 
-  const [leaseInfo, setLeaseInfo] = useState<LeaseInfo | null>(null);
+  const [status, setStatus] = useState<"loading" | "invalid" | "expired" | "already_signed" | "review" | "success">("loading");
+  const [data, setData] = useState<ValidateResponse | null>(null);
+  const [signedPdfUrl, setSignedPdfUrl] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
-  const [loading, setLoading] = useState(!!(applicationId && email) || !!token);
+  const [canSign, setCanSign] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [signed, setSigned] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const useAppIdEmail = applicationId && email;
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const { scrollTop, clientHeight, scrollHeight } = el;
+    setCanSign(scrollTop + clientHeight >= scrollHeight - 10);
+  }, []);
 
   useEffect(() => {
-    if (useAppIdEmail) {
-      fetch(
-        `/api/tenant/lease?applicationId=${encodeURIComponent(applicationId)}&email=${encodeURIComponent(email!)}`
-      )
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.signed) {
-            setSigned(true);
-            setLeaseInfo(data);
-          } else {
-            setLeaseInfo(data);
-          }
-        })
-        .catch(() => setError("Invalid link or access denied"))
-        .finally(() => setLoading(false));
-    } else if (token) {
-      fetch(`/api/sign-lease?token=${encodeURIComponent(token)}`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.signed) {
-            setSigned(true);
-            setLeaseInfo({
-              applicationId: "",
-              tenantName: data.tenantName ?? "",
-              propertyAddress: data.propertyAddress ?? "",
-              rent: null,
-              leasePdfUrl: null,
-              signed: true,
-              signedAt: null,
-              signedPdfUrl: data.signedPdfUrl ?? null
-            });
-          } else {
-            setLeaseInfo({
-              applicationId: "",
-              tenantName: data.tenantName ?? "",
-              propertyAddress: data.propertyAddress ?? "",
-              rent: null,
-              leasePdfUrl: null,
-              signed: false,
-              signedAt: null,
-              signedPdfUrl: null
-            });
-          }
-        })
-        .catch(() => setError("Invalid link"))
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-      setError("Missing application ID and email. Use the link from your email.");
+    if (!token.trim()) {
+      setStatus("invalid");
+      return;
     }
-  }, [applicationId, email, token, useAppIdEmail]);
+    fetch(`/api/sign-lease/validate?token=${encodeURIComponent(token)}`)
+      .then((r) => r.json())
+      .then((res: ValidateResponse) => {
+        setData(res);
+        if (res.alreadySigned) {
+          setStatus("already_signed");
+          return;
+        }
+        if (res.expired || !res.valid) {
+          setStatus(res.expired ? "expired" : "invalid");
+          return;
+        }
+        setStatus("review");
+      })
+      .catch(() => setStatus("invalid"));
+  }, [token]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || status !== "review") return;
+    checkScroll();
+    el.addEventListener("scroll", checkScroll);
+    return () => el.removeEventListener("scroll", checkScroll);
+  }, [status, checkScroll]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim()) {
-      setError("Please type your full legal name");
-      return;
-    }
-    setSubmitting(true);
+    if (!fullName.trim() || !canSign || submitting) return;
     setError(null);
+    setSubmitting(true);
     try {
-      if (useAppIdEmail && applicationId && email) {
-        const res = await fetch(`/api/applications/${applicationId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            signature: fullName.trim(),
-            signed_at: new Date().toISOString(),
-            email: email.trim()
-          })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to submit");
-        setSigned(true);
-      } else if (token) {
-        const res = await fetch("/api/sign-lease", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token, signature: fullName.trim() })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to submit");
-        setSigned(true);
-        setLeaseInfo((prev) => (prev ? { ...prev, signed: true, signedPdfUrl: data.signedPdfUrl ?? null } : null));
-      }
+      const res = await fetch("/api/sign-lease/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, signedByName: fullName.trim() })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to sign");
+      setSignedPdfUrl(json.signedPdfUrl ?? null);
+      setStatus("success");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -123,80 +87,128 @@ function SignLeaseContent() {
     }
   };
 
-  if (loading) {
+  if (status === "loading") {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
+      <main className="mx-auto flex max-w-lg min-h-[40vh] items-center justify-center px-4 py-12">
         <p className="text-slate-600">Loading…</p>
-      </div>
+      </main>
     );
   }
 
-  if (error && !leaseInfo) {
+  if (status === "invalid" || status === "expired") {
     return (
       <main className="mx-auto max-w-lg px-4 py-12 text-center">
         <h1 className="text-xl font-semibold text-slate-900">Sign Lease</h1>
-        <p className="mt-2 text-slate-600">{error}</p>
-        <Link href="/portal" className="mt-4 inline-block text-sm text-slate-600 underline">
-          Back to portal
+        <p className="mt-2 text-slate-600">
+          This signing link has expired or is invalid. Contact your landlord for a new link.
+        </p>
+        <Link href="/" className="mt-4 inline-block text-sm text-slate-600 underline">
+          Back to home
         </Link>
       </main>
     );
   }
 
-  if (signed && leaseInfo) {
+  if (status === "already_signed" && data) {
+    const signedDate = data.signedAt ? new Date(data.signedAt).toLocaleDateString() : "";
+    return (
+      <main className="mx-auto max-w-lg px-4 py-12 text-center">
+        <h1 className="text-xl font-semibold text-slate-900">Lease already signed</h1>
+        <p className="mt-2 text-slate-600">
+          This lease has already been signed{signedDate ? ` on ${signedDate}` : ""}.
+        </p>
+        <Link href="/" className="mt-4 inline-block text-sm text-slate-600 underline">
+          Back to home
+        </Link>
+      </main>
+    );
+  }
+
+  if (status === "success") {
     return (
       <main className="mx-auto max-w-lg px-4 py-12">
         <div className="rounded-2xl bg-emerald-50 p-6 text-center">
-          <h1 className="text-xl font-semibold text-emerald-800">Lease signed</h1>
-          <p className="mt-2 text-slate-700">Thank you. Your signature has been recorded.</p>
-          {leaseInfo.signedPdfUrl && (
+          <h1 className="text-xl font-semibold text-emerald-800">✓ Lease signed successfully</h1>
+          <p className="mt-2 text-slate-700">
+            Your signed lease has been sent to your email. A copy has also been sent to your landlord.
+          </p>
+          {signedPdfUrl && (
             <a
-              href={leaseInfo.signedPdfUrl}
+              href={signedPdfUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-4 inline-block rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+              className="mt-4 inline-block rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
             >
-              Download signed lease
+              Download signed lease (PDF)
             </a>
           )}
         </div>
         <p className="mt-4 text-center text-sm text-slate-600">
-          <Link href="/portal" className="underline">Back to portal</Link>
+          <Link href="/" className="underline">Back to home</Link>
         </p>
       </main>
     );
   }
 
-  if (!leaseInfo) return null;
+  if (status !== "review" || !data) return null;
+
+  const hasScrollableContent = data.leaseContent.length > 0;
 
   return (
     <main className="mx-auto max-w-lg space-y-6 px-4 py-8">
-      <h1 className="text-2xl font-bold text-slate-900">Review and sign your lease</h1>
+      <h1 className="text-2xl font-bold text-slate-900">Lease agreement</h1>
 
-      <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <h2 className="text-sm font-semibold text-slate-800">Lease details</h2>
-        {leaseInfo.tenantName && <p className="mt-1 text-sm text-slate-700">Tenant: {leaseInfo.tenantName}</p>}
-        {leaseInfo.propertyAddress && <p className="text-sm text-slate-700">Property: {leaseInfo.propertyAddress}</p>}
-        {leaseInfo.rent != null && <p className="text-sm text-slate-700">Monthly rent: ${leaseInfo.rent}</p>}
-      </section>
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <p className="text-sm font-medium text-slate-800">{data.propertyAddress}</p>
+        {data.tenantName && (
+          <p className="text-sm text-slate-600">Prepared for: {data.tenantName}</p>
+        )}
+      </div>
 
-      {leaseInfo.leasePdfUrl && (
-        <p className="text-sm text-slate-600">
-          <a
-            href={leaseInfo.leasePdfUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-medium text-blue-600 underline"
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <h2 className="text-sm font-semibold text-slate-800">Lease content</h2>
+        {hasScrollableContent ? (
+          <div
+            ref={scrollRef}
+            className="mt-3 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 text-left text-sm text-slate-700 whitespace-pre-wrap"
           >
-            View full lease (PDF)
-          </a>
-        </p>
-      )}
+            {data.leaseContent}
+          </div>
+        ) : (
+          <div
+            ref={scrollRef}
+            className="mt-3 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700"
+          >
+            <p className="mb-2">Please read the full lease document before signing.</p>
+            {data.leasePdfUrl && (
+              <p className="mb-4">
+                <a
+                  href={data.leasePdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-blue-600 underline"
+                >
+                  View full lease (PDF)
+                </a>
+              </p>
+            )}
+            <p className="mb-2">By signing below, you confirm that you have read and agree to the terms of this lease agreement.</p>
+            <p className="mb-2">Your signature indicates your acceptance of all terms and conditions contained in the lease document.</p>
+            <p className="mb-2">This document will be stored and may be used as evidence of your agreement.</p>
+            <p className="mb-2">If you have not read the full lease, please open the PDF link above and review it before signing.</p>
+            <p className="mb-2">Scroll to the bottom of this box to enable the sign button.</p>
+          </div>
+        )}
+      </div>
+
+      <p className="text-sm text-slate-600">
+        By signing, you confirm you have read and agree to the terms of this lease agreement.
+      </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="signature-name" className="block text-sm font-medium text-slate-700">
-            Type your full legal name to sign
+            Your full legal name
           </label>
           <input
             id="signature-name"
@@ -208,18 +220,24 @@ function SignLeaseContent() {
             onChange={(e) => setFullName(e.target.value)}
           />
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
         <button
           type="submit"
-          disabled={submitting}
+          disabled={!canSign || !fullName.trim() || submitting}
           className="w-full min-h-[48px] rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
         >
-          {submitting ? "Submitting…" : "Sign lease"}
+          {submitting ? "Signing…" : "Sign lease agreement"}
         </button>
       </form>
 
+      {!canSign && (
+        <p className="text-center text-xs text-slate-500">
+          Scroll to the bottom of the lease content above to enable the sign button.
+        </p>
+      )}
+
       <p className="text-center text-sm text-slate-500">
-        By signing, you agree to the lease terms above and in the linked document.
+        <Link href="/" className="underline">Back to home</Link>
       </p>
     </main>
   );
@@ -229,9 +247,9 @@ export default function SignLeasePage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-[40vh] items-center justify-center">
+        <main className="flex min-h-[40vh] items-center justify-center">
           <p className="text-slate-600">Loading…</p>
-        </div>
+        </main>
       }
     >
       <SignLeaseContent />

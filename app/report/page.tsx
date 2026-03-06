@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 const URGENCIES = [
   { value: "low", label: "Low" },
@@ -9,7 +10,8 @@ const URGENCIES = [
   { value: "high", label: "High" }
 ];
 
-export default function ReportPage() {
+function ReportForm() {
+  const searchParams = useSearchParams();
   const [applicationId, setApplicationId] = useState("");
   const [email, setEmail] = useState("");
   const [unitOrAddress, setUnitOrAddress] = useState("");
@@ -23,6 +25,11 @@ export default function ReportPage() {
   const [ticketId, setTicketId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const id = searchParams.get("applicationId");
+    if (id) setApplicationId(id);
+  }, [searchParams]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -47,8 +54,7 @@ export default function ReportPage() {
         unitOrAddress: unitOrAddress.trim() || undefined,
         title: title.trim(),
         description: description.trim(),
-        urgency,
-        category: "other"
+        urgency
       };
       if (photoBase64) {
         body.photoBase64 = photoBase64;
@@ -61,7 +67,7 @@ export default function ReportPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Request failed");
-      setTicketId(data.id ?? null);
+      setTicketId(data.requestId ?? data.id ?? null);
       setDone(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
@@ -76,14 +82,13 @@ export default function ReportPage() {
         <div className="rounded-2xl bg-emerald-50 p-6 text-center">
           <h1 className="text-xl font-bold text-emerald-800">Request submitted</h1>
           <p className="mt-2 text-slate-700">
-            We've received your maintenance request and will address it as soon as possible.
+            Your request has been submitted. Your landlord will be in touch.
           </p>
           {ticketId && (
             <p className="mt-4 rounded-lg bg-white/80 px-4 py-2 font-mono text-sm text-slate-800">
               Ticket number: <strong>{ticketId}</strong>
             </p>
           )}
-          <p className="mt-2 text-xs text-slate-600">A confirmation has been sent to your email.</p>
         </div>
         <Link href="/" className="block text-center text-sm underline text-slate-600">Back to home</Link>
       </main>
@@ -220,5 +225,13 @@ export default function ReportPage() {
       </form>
       <Link href="/" className="block text-center text-sm underline text-slate-600">Back to home</Link>
     </main>
+  );
+}
+
+export default function ReportPage() {
+  return (
+    <Suspense fallback={<main className="space-y-6"><p className="text-slate-500">Loading…</p></main>}>
+      <ReportForm />
+    </Suspense>
   );
 }

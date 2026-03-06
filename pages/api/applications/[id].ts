@@ -22,8 +22,10 @@ export default async function handler(req: Request) {
   if (req.method === "PATCH") {
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch { /* empty body */ }
-    const { signature: bodySignature, signed_at: bodySignedAt, email: bodyEmail, status, changedBy } = body as {
+    const { signature: bodySignature, signed_at: bodySignedAt, email: bodyEmail, status, changedBy, leaseStartAt, leaseEndAt } = body as {
       signature?: string; signed_at?: string; email?: string; status?: string; changedBy?: string;
+      leaseStartAt?: string | null;
+      leaseEndAt?: string | null;
     };
     const isTenantSigning = !req.headers.get?.("authorization") && typeof bodySignature === "string" && bodySignature.trim() && typeof bodySignedAt === "string" && typeof bodyEmail === "string";
 
@@ -66,7 +68,11 @@ export default async function handler(req: Request) {
     const fromStatus = (existing as { status?: string } | null)?.status ?? null;
     const tenant = (existing as { tenants: { first_name: string; last_name: string; email: string } | null } | null)?.tenants;
 
-    const { error } = await supabase.from("applications").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
+    const updates: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
+    if (leaseStartAt !== undefined) updates.lease_start_at = typeof leaseStartAt === "string" && /^\d{4}-\d{2}-\d{2}$/.test(leaseStartAt.trim()) ? leaseStartAt.trim() : null;
+    if (leaseEndAt !== undefined) updates.lease_end_at = typeof leaseEndAt === "string" && /^\d{4}-\d{2}-\d{2}$/.test(leaseEndAt.trim()) ? leaseEndAt.trim() : null;
+
+    const { error } = await supabase.from("applications").update(updates).eq("id", id);
 
     if (error) {
       console.error(error);

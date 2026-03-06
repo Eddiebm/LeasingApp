@@ -6,7 +6,7 @@ import Link from "next/link";
 import { supabase } from "../../lib/supabaseClient";
 import { SubscriptionProvider, useSubscription } from "../../components/SubscriptionContext";
 
-const LOGIN_SIGNUP_PATHS = ["/dashboard/login", "/dashboard/signup"];
+const LOGIN_SIGNUP_PATHS = ["/dashboard/login", "/dashboard/signup", "/dashboard/forgot-password", "/dashboard/reset-password"];
 
 function FreePlanBanner() {
   const { isPro } = useSubscription();

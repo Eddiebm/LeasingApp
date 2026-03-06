@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { getLandlordOrAdmin, getAdminClient } from "../../../lib/apiAuth";
 import { createSupabaseForUser } from "../../../lib/supabaseUser";
 import { getEnv } from "../../../lib/cloudflareEnv";
+import { sendNewApplicationEmail } from "../../../lib/email";
 
 export const runtime = "edge";
 
@@ -31,7 +32,10 @@ export default async function handler(req: Request) {
         income,
         previous_landlord,
         created_at,
-        tenants ( first_name, last_name, email, phone ),
+        tenant_id,
+        lease_start_at,
+        lease_end_at,
+        tenants ( id, first_name, last_name, email, phone ),
         properties ( id, address, city, state, zip, rent ),
         payments ( status, payment_type )
       `)
@@ -45,7 +49,7 @@ export default async function handler(req: Request) {
     }
 
     const list = (applications ?? []).map((a: Record<string, unknown>) => {
-      const tenant = a.tenants as { first_name: string; last_name: string; email: string; phone: string } | null;
+      const tenant = a.tenants as { id: string; first_name: string; last_name: string; email: string; phone: string } | null;
       const property = a.properties as { id: string; address: string; city: string; state: string; zip: string; rent: number } | null;
       const payments = (a.payments as { status: string; payment_type: string }[] | null) ?? [];
       const hasPaidScreening = payments.some((p) => p.payment_type === "screening_fee" && p.status === "paid");
@@ -54,10 +58,13 @@ export default async function handler(req: Request) {
       return {
         id: a.id,
         status: a.status,
+        tenantId: (a.tenant_id as string) ?? tenant?.id ?? null,
         creditScore: a.credit_score,
         income: a.income,
         previousLandlord: a.previous_landlord,
         createdAt: a.created_at,
+        leaseStartAt: (a.lease_start_at as string) ?? null,
+        leaseEndAt: (a.lease_end_at as string) ?? null,
         tenantName: tenant ? `${tenant.first_name} ${tenant.last_name}` : "",
         tenantEmail: tenant?.email ?? "",
         tenantPhone: tenant?.phone ?? "",
@@ -160,28 +167,26 @@ export default async function handler(req: Request) {
 
   const appId = (appRow as { id: string }).id;
   const env = getEnv();
-  const resendKey = env.RESEND_API_KEY;
+  const tenantName = `${String(data.firstName).trim()} ${String(data.lastName).trim()}`;
+  const origin = req.headers.get?.("origin") || req.headers.get?.("referer")?.replace(/\/$/, "") || "https://leasingapp.pages.dev";
+  const dashboardLink = `${origin}/dashboard`;
+
+  let propertyAddress = "—";
+  const pid = data.propertyId ? String(data.propertyId) : null;
+  if (pid) {
+    const { data: prop } = await adminClient.from("properties").select("address, city, state, zip").eq("id", pid).maybeSingle();
+    if (prop && typeof prop === "object" && "address" in prop) {
+      const p = prop as { address: string; city: string; state: string; zip: string };
+      propertyAddress = [p.address, p.city, p.state, p.zip].filter(Boolean).join(", ");
+    }
+  }
+
   const landlordEmail = env.LANDLORD_EMAIL;
-  if (resendKey && landlordEmail) {
-    const resend = new Resend(resendKey);
-    const tenantName = `${String(data.firstName).trim()} ${String(data.lastName).trim()}`;
-    const origin = req.headers.get?.("origin") || req.headers.get?.("referer")?.replace(/\/$/, "") || "https://leasingapp.pages.dev";
-    const dashboardLink = `${origin}/dashboard`;
-    resend.emails
-      .send({
-        from: env.EMAIL_FROM ?? "Leasing <onboarding@resend.dev>",
-        to: [landlordEmail],
-        subject: "New rental application submitted",
-        html: `
-          <p>A new application has been submitted.</p>
-          <p><strong>Tenant:</strong> ${tenantName}</p>
-          <p><strong>Email:</strong> ${data.email}</p>
-          <p><strong>Phone:</strong> ${data.phone}</p>
-          <p><strong>DOB:</strong> ${data.dob}</p>
-          <p><a href="${dashboardLink}">View in dashboard</a></p>
-        `
-      })
-      .catch(console.error);
+  if (landlordEmail) {
+    sendNewApplicationEmail(landlordEmail, tenantName, propertyAddress, appId, dashboardLink, {
+      resendApiKey: env.RESEND_API_KEY,
+      from: env.EMAIL_FROM ?? "Leasing <onboarding@resend.dev>"
+    }).catch(console.error);
   }
   if (env.RESEND_API_KEY && data.email) {
     const origin = req.headers.get?.("origin") || req.headers.get?.("referer")?.replace(/\/$/, "") || "https://leasingapp.pages.dev";

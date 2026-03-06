@@ -5,11 +5,9 @@ import { getEnv } from "../../../lib/cloudflareEnv";
 
 export const runtime = "edge";
 
-export const config = { api: { bodyParser: { sizeLimit: "6mb" } } };
-
-const CATEGORIES = ["plumbing", "electrical", "hvac", "appliance", "pest", "other"] as const;
 const URGENCIES = ["low", "medium", "high"] as const;
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // 5 MB
+const BUCKET = "maintenance-photos";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -32,9 +30,10 @@ export default async function handler(req: Request) {
       .from("maintenance_requests")
       .select(`
         id,
-        category,
+        title,
         description,
         photo_url,
+        urgency,
         status,
         created_at,
         updated_at,
@@ -69,9 +68,10 @@ export default async function handler(req: Request) {
       const property = app?.properties;
       return {
         id: r.id,
-        category: r.category,
+        title: r.title,
         description: r.description,
         photoUrl: r.photo_url,
+        urgency: r.urgency,
         status: r.status,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
@@ -88,85 +88,150 @@ export default async function handler(req: Request) {
   if (req.method !== "POST") return new Response(null, { status: 405 });
 
   let body: Record<string, unknown> = {};
-  try { body = await req.json(); } catch { /* empty body */ }
-  const { applicationId: bodyAppId, email, category, description, title, urgency, photoUrl, photoBase64, photoFileName } = body as Record<string, unknown>;
-  if (!bodyAppId || !email || !category || !CATEGORIES.includes(category as typeof CATEGORIES[number])) {
-    return json({ error: "applicationId, email, and valid category required" }, 400);
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400);
   }
 
+  const { applicationId, email, unitOrAddress, title, description, urgency, photoBase64, photoFileName } = body as Record<string, unknown>;
+  const appId = typeof applicationId === "string" ? applicationId.trim() : "";
+  const emailStr = typeof email === "string" ? email.trim().toLowerCase() : "";
+  const titleStr = typeof title === "string" ? title.trim() : "";
+
+  if (!appId || !emailStr || !titleStr) {
+    return json({ error: "applicationId, email, and title are required" }, 400);
+  }
+
+  const urgencyVal = typeof urgency === "string" && (URGENCIES as readonly string[]).includes(urgency) ? urgency : "medium";
+
   const supabase = getAdminClient();
+
+  // 1. Look up application by applicationId and get tenant, property, landlord
   const { data: application, error: appError } = await supabase
     .from("applications")
-    .select("id, tenants ( email )")
-    .eq("tenants.email", String(email).trim().toLowerCase())
-    .order("created_at", { ascending: false })
-    .limit(1)
+    .select(`
+      id,
+      tenant_id,
+      property_id,
+      tenants ( id, first_name, last_name, email ),
+      properties ( id, address, city, state, zip, landlord_id )
+    `)
+    .eq("id", appId)
     .maybeSingle();
 
   if (appError || !application) {
-    return json({ error: "No application found for this email address" }, 404);
+    return json({ error: "Application not found" }, 404);
   }
 
-  const applicationId = (application as { id: string }).id;
-  const tenantEmail = (application as { tenants: { email: string } | null }).tenants?.email;
+  const app = application as {
+    id: string;
+    tenant_id: string;
+    property_id: string | null;
+    tenants: { id: string; first_name: string; last_name: string; email: string } | null;
+    properties: { id: string; address: string; city: string; state: string; zip: string; landlord_id: string } | null;
+  };
+  const tenantEmail = app.tenants?.email?.toLowerCase();
+  if (tenantEmail !== emailStr) {
+    return json({ error: "Email does not match this application" }, 403);
+  }
 
-  let resolvedPhotoUrl: string | null = typeof photoUrl === "string" ? photoUrl : null;
-  if (!resolvedPhotoUrl && photoBase64 && typeof photoBase64 === "string") {
+  const tenantId = app.tenants?.id ?? app.tenant_id;
+  const propertyId = app.property_id ?? app.properties?.id ?? null;
+  const landlordId = app.properties?.landlord_id ?? null;
+  const tenantName = app.tenants ? `${app.tenants.first_name} ${app.tenants.last_name}`.trim() : "Tenant";
+  const propertyAddress = app.properties
+    ? `${app.properties.address}, ${app.properties.city}, ${app.properties.state} ${app.properties.zip}`
+    : unitOrAddress && typeof unitOrAddress === "string"
+      ? String(unitOrAddress).trim()
+      : "";
+
+  // 2. Optional photo upload to maintenance-photos bucket
+  let photoUrl: string | null = null;
+  if (photoBase64 && typeof photoBase64 === "string") {
     try {
       const base64 = String(photoBase64).replace(/^data:[^;]+;base64,/, "");
       const buffer = Buffer.from(base64, "base64");
       if (buffer.length > MAX_PHOTO_SIZE) return json({ error: "Photo too large (max 5 MB)" }, 400);
-      const ext = (photoFileName as string)?.split(".").pop() || "jpg";
-      const safeName = `maintenance/${applicationId}-${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage.from("documents").upload(safeName, buffer, { contentType: "image/jpeg", upsert: true });
+      const ext = (typeof photoFileName === "string" && photoFileName.split(".").pop()) || "jpg";
+      const safeName = `maintenance/${appId}-${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(safeName, buffer, {
+        contentType: "image/jpeg",
+        upsert: true
+      });
       if (!uploadErr) {
-        const { data: urlData } = supabase.storage.from("documents").getPublicUrl(safeName);
-        resolvedPhotoUrl = urlData.publicUrl;
+        const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(safeName);
+        photoUrl = urlData.publicUrl;
       }
     } catch (e) {
       console.error("Maintenance photo upload error", e);
       return json({ error: "Invalid photo data" }, 400);
     }
   }
-  const urgencyLabel = typeof urgency === "string" && URGENCIES.includes(urgency as typeof URGENCIES[number]) ? urgency : "medium";
-  const titlePart = typeof title === "string" && String(title).trim() ? `Title: ${String(title).trim()}\n\n` : "";
-  const descBody = String(description ?? "").trim() || "—";
-  const fullDescription = `Urgency: ${urgencyLabel}\n${titlePart}${descBody}`;
 
-  const { data: row, error } = await supabase
+  // 3. Insert maintenance_requests (schema: application_id, tenant_id, property_id, landlord_id, title, description, urgency, status, photo_url)
+  const { data: row, error: insertError } = await supabase
     .from("maintenance_requests")
     .insert({
-      application_id: applicationId,
-      category,
-      description: fullDescription,
-      photo_url: resolvedPhotoUrl,
-      status: "submitted"
+      application_id: appId,
+      tenant_id: tenantId,
+      property_id: propertyId,
+      landlord_id: landlordId,
+      title: titleStr,
+      description: typeof description === "string" ? String(description).trim() || null : null,
+      urgency: urgencyVal,
+      status: "open",
+      photo_url: photoUrl
     })
     .select("id, created_at")
     .single();
 
-  if (error) {
-    console.error(error);
-    return json({ error: error.message }, 500);
+  if (insertError) {
+    console.error(insertError);
+    return json({ error: insertError.message }, 500);
   }
 
-  const ticketId = (row as { id: string }).id;
+  const requestId = (row as { id: string }).id;
+
+  // 4. Email landlord (LANDLORD_EMAIL)
   const env = getEnv();
-  if (env.RESEND_API_KEY && tenantEmail) {
+  const landlordEmail = env.LANDLORD_EMAIL;
+  if (env.RESEND_API_KEY && landlordEmail) {
     const resend = new Resend(env.RESEND_API_KEY);
     resend.emails
       .send({
         from: env.EMAIL_FROM ?? "Leasing <onboarding@resend.dev>",
-        to: [tenantEmail],
-        subject: "Maintenance request received – Ticket #" + ticketId.slice(0, 8),
+        to: [landlordEmail],
+        subject: `New maintenance request: ${titleStr} — ${urgencyVal} priority`,
         html: `
-          <p>We've received your maintenance request.</p>
-          <p><strong>Ticket number:</strong> ${ticketId}</p>
-          <p>We'll update you on progress. You can reference this ticket number when following up.</p>
+          <p><strong>Tenant:</strong> ${tenantName}</p>
+          <p><strong>Property:</strong> ${propertyAddress || "—"}</p>
+          <p><strong>Title:</strong> ${titleStr}</p>
+          <p><strong>Urgency:</strong> ${urgencyVal}</p>
+          <p><strong>Description:</strong></p>
+          <p>${typeof description === "string" ? description.trim() || "—" : "—"}</p>
+          ${photoUrl ? `<p><a href="${photoUrl}">View photo</a></p>` : ""}
         `
       })
       .catch(console.error);
   }
 
-  return json({ success: true, id: ticketId, createdAt: (row as { created_at: string }).created_at }, 201);
+  // 5. Optional: send acknowledgement to tenant (spec item 5 - sendMaintenanceAcknowledgementEmail can be wired later)
+  if (env.RESEND_API_KEY && tenantEmail) {
+    const resend = new Resend(env.RESEND_API_KEY);
+    resend.emails
+      .send({
+        from: env.EMAIL_FROM ?? "Leasing <onboarding@resend.dev>",
+        to: [app.tenants?.email ?? emailStr],
+        subject: `We received your maintenance request: ${titleStr}`,
+        html: `
+          <p>Hi ${tenantName},</p>
+          <p>We've received your maintenance request: <strong>${titleStr}</strong> (${urgencyVal} priority).</p>
+          <p>Your landlord will be in touch within 24–48 hours.</p>
+        `
+      })
+      .catch(console.error);
+  }
+
+  return json({ success: true, requestId, id: requestId }, 201);
 }
