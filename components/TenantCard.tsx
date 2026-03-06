@@ -15,6 +15,14 @@ type Application = {
   income?: number | null;
   rent?: number | null;
   screeningStatus?: "not_paid" | "paid_pending" | "complete";
+  tenantPassport?: {
+    creditScore: number | null;
+    riskLevel?: "low" | "medium" | "high" | null;
+    identityVerified?: boolean | null;
+    incomeVerified?: boolean | null;
+    rightToRent?: string | null;
+    passportExpiryDate?: string | null;
+  } | null;
 };
 
 type Doc = { id: string; type: string; file_url: string; created_at: string };
@@ -33,6 +41,7 @@ export default function TenantCard({ application, onRefresh, getAuthHeaders, use
   const [generatingDoc, setGeneratingDoc] = useState(false);
   const [selectedDocType, setSelectedDocType] = useState<string>("");
   const [showOptionalsModal, setShowOptionalsModal] = useState(false);
+  const [passport, setPassport] = useState<Application["tenantPassport"] | null>(null);
   const headers = (): HeadersInit => {
     const h: HeadersInit = { "Content-Type": "application/json" };
     if (getAuthHeaders) Object.assign(h, getAuthHeaders());
@@ -46,6 +55,27 @@ export default function TenantCard({ application, onRefresh, getAuthHeaders, use
       .then((d) => setDocs(Array.isArray(d) ? d : []))
       .catch(() => setDocs([]));
   }, [showDocs, application.id, getAuthHeaders]);
+
+  useEffect(() => {
+    if (!application.id) return;
+    fetch(`/api/tenant-passport/${application.id}`, { headers: getAuthHeaders?.() ?? {} })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.passport) {
+          setPassport({
+            creditScore: data.passport.creditScore ?? null,
+            riskLevel: data.passport.riskLevel ?? null,
+            identityVerified: data.passport.identityVerified ?? null,
+            incomeVerified: data.passport.incomeVerified ?? null,
+            rightToRent: data.passport.rightToRent ?? null,
+            passportExpiryDate: data.passport.passportExpiryDate ?? null
+          });
+        } else {
+          setPassport(null);
+        }
+      })
+      .catch(() => setPassport(null));
+  }, [application.id, getAuthHeaders]);
 
   const updateStatus = async (status: string) => {
     try {
@@ -141,9 +171,15 @@ export default function TenantCard({ application, onRefresh, getAuthHeaders, use
           <span className="text-slate-500">Screening: processing</span>
         )}
         {application.screeningStatus === "complete" && (
-          <span>Screening: complete{application.creditScore != null ? ` · Credit: ${application.creditScore}` : ""}</span>
+          <span>
+            Screening: complete
+            {passport?.creditScore != null ? ` · Credit: ${passport.creditScore}` : application.creditScore != null ? ` · Credit: ${application.creditScore}` : ""}
+          </span>
         )}
         {application.income != null && <span>Income: ${application.income}</span>}
+        {passport?.identityVerified && <span>Identity: verified</span>}
+        {passport?.incomeVerified && <span>Income: verified</span>}
+        {passport?.rightToRent && <span>Right to Rent: {passport.rightToRent}</span>}
       </div>
 
       <div className="mt-3">

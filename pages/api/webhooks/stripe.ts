@@ -118,7 +118,7 @@ export default async function handler(req: Request) {
 
       const { data: payment } = await getSupabaseServer()
         .from("payments")
-        .select("application_id, payment_type")
+        .select("application_id, payment_type, amount_cents, currency")
         .eq("id", paymentId)
         .single();
 
@@ -126,12 +126,12 @@ export default async function handler(req: Request) {
         const applicationId = (payment as { application_id: string }).application_id;
         const { data: app } = await getSupabaseServer()
           .from("applications")
-          .select("id, tenants ( first_name, last_name, dob )")
+          .select("id, tenants ( id, first_name, last_name, dob )")
           .eq("id", applicationId)
           .single();
         if (app) {
-          const tenant = (app as { tenants: { first_name: string; last_name: string; dob: string } | null }).tenants;
-          if (tenant?.dob) {
+          const tenant = (app as { tenants: { id: string; first_name: string; last_name: string; dob: string } | null }).tenants;
+          if (tenant?.dob && tenant.id) {
             try {
               const { runScreening } = await import("../../../lib/runScreening");
               const screenData = await runScreening({
@@ -139,7 +139,10 @@ export default async function handler(req: Request) {
                 lastName: tenant.last_name,
                 dob: tenant.dob
               });
-              await getSupabaseServer()
+
+              // Persist legacy fields on applications for backward-compatible UI.
+              const supabaseServer = getSupabaseServer();
+              await supabaseServer
                 .from("applications")
                 .update({
                   credit_score: screenData.credit_score ?? null,
@@ -149,6 +152,79 @@ export default async function handler(req: Request) {
                   }
                 })
                 .eq("id", applicationId);
+
+              // Create a tenant_screenings row to track this screening event.
+              const screeningInsert = await supabaseServer
+                .from("tenant_screenings")
+                .insert({
+                  tenant_id: tenant.id,
+                  application_id: applicationId,
+                  jurisdiction: null,
+                  provider: process.env.RENTPREP_API_KEY ? "rentprep" : process.env.CHECKR_API_KEY ? "checkr" : "mock",
+                  status: "completed",
+                  started_at: new Date().toISOString(),
+                  completed_at: new Date().toISOString(),
+                  amount_cents: (payment as { amount_cents?: number }).amount_cents ?? null,
+                  currency: (payment as { currency?: string }).currency ?? null
+                })
+                .select("id")
+                .single();
+
+              const screeningId =
+                (screeningInsert.data as { id: string } | null)?.id ?? null;
+
+              if (screeningId) {
+                // Save a normalized summary; raw_encrypted left null until real provider wiring is added.
+                await supabaseServer.from("screening_reports").insert({
+                  tenant_screening_id: screeningId,
+                  summary: {
+                    credit_score: screenData.credit_score,
+                    evictions: screenData.evictions,
+                    criminal_record: screenData.criminal_record
+                  }
+                });
+
+                // Upsert tenant_passport for this tenant.
+                const now = new Date();
+                const expiry = new Date(now.getTime() + 45 * 24 * 60 * 60 * 1000); // ~45 days
+                const { data: existingPassport } = await supabaseServer
+                  .from("tenant_passports")
+                  .select("id, passport_expiry_date")
+                  .eq("tenant_id", tenant.id)
+                  .gt("passport_expiry_date", now.toISOString())
+                  .maybeSingle();
+
+                if (existingPassport) {
+                  await supabaseServer
+                    .from("tenant_passports")
+                    .update({
+                      identity_verified: true,
+                      credit_score: screenData.credit_score,
+                      income_verified: null,
+                      eviction_history: screenData.evictions,
+                      criminal_records: screenData.criminal_record,
+                      right_to_rent: null,
+                      screening_provider: process.env.RENTPREP_API_KEY ? "rentprep" : process.env.CHECKR_API_KEY ? "checkr" : "mock",
+                      last_screening_id: screeningId,
+                      passport_expiry_date: expiry.toISOString(),
+                      updated_at: now.toISOString()
+                    })
+                    .eq("id", (existingPassport as { id: string }).id);
+                } else {
+                  await supabaseServer.from("tenant_passports").insert({
+                    tenant_id: tenant.id,
+                    identity_verified: true,
+                    credit_score: screenData.credit_score,
+                    income_verified: null,
+                    eviction_history: screenData.evictions,
+                    criminal_records: screenData.criminal_record,
+                    right_to_rent: null,
+                    screening_provider: process.env.RENTPREP_API_KEY ? "rentprep" : process.env.CHECKR_API_KEY ? "checkr" : "mock",
+                    last_screening_id: screeningId,
+                    passport_expiry_date: expiry.toISOString()
+                  });
+                }
+              }
             } catch (e) {
               console.error("Screening after payment error", e);
             }

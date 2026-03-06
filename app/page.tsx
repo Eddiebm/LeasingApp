@@ -97,6 +97,13 @@ export default function HomePage() {
         >
           Terms of Service
         </Link>
+
+        <Link
+          href="/design-demos"
+          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-slate-600 text-sm"
+        >
+          Design examples &amp; alternatives
+        </Link>
       </div>
     </main>
   );

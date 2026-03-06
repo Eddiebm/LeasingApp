@@ -22,9 +22,48 @@ function SuccessContent() {
           </p>
         )}
       </div>
+
+      <section className="space-y-3 rounded-2xl bg-white p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-slate-900">Next steps</h2>
+        <ol className="space-y-2 text-sm text-slate-700">
+          <li>
+            <span className="font-medium">Step 1 – Application submitted</span> · you’re done.
+          </li>
+          {applicationId && (
+            <>
+              <li>
+                <span className="font-medium">Step 2 – Screening (optional)</span>{" "}
+                · pay the screening fee so your landlord can see a Tenant Passport.
+                <div className="mt-1">
+                  <Link
+                    href={`/apply/screening-payment?applicationId=${encodeURIComponent(applicationId)}`}
+                    className="inline-flex items-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                  >
+                    Pay screening fee
+                  </Link>
+                </div>
+              </li>
+              <li>
+                <span className="font-medium">Step 3 – Upload documents</span>{" "}
+                · add ID and income documents for your landlord.
+                <div className="mt-1">
+                  <Link
+                    href={`/apply/documents?applicationId=${encodeURIComponent(applicationId)}`}
+                    className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 hover:bg-slate-50"
+                  >
+                    Upload documents
+                  </Link>
+                </div>
+              </li>
+            </>
+          )}
+        </ol>
+      </section>
+
       <p className="text-center text-sm text-slate-600">
         We sent a confirmation to your email. You can check your status anytime at the tenant portal.
       </p>
+
       <div className="flex flex-col items-center gap-3">
         {applicationId && email && (
           <Link
