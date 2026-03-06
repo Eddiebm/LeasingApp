@@ -1,5 +1,5 @@
-import { getAdminClient } from "../../../lib/apiAuth";
-import { getEnv } from "../../../lib/cloudflareEnv";
+import { getAdminClient } from "../../../../lib/apiAuth";
+import { getEnv } from "../../../../lib/cloudflareEnv";
 
 export const runtime = "edge";
 

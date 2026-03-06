@@ -170,7 +170,6 @@ export default function PropertyRentPage() {
         });
         if (!res.ok) throw new Error((await res.json()).error || "Failed to create");
         const created = await res.json();
-        const selectedApp = applications.find((a) => a.id === selectedApplicationId);
         const newSchedule: Schedule = {
           id: created.id,
           propertyId,

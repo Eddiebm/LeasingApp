@@ -1,5 +1,6 @@
 import { getRequestContext } from "@cloudflare/next-on-pages";
 import { getAdminClient } from "../../lib/apiAuth";
+import { logAiUsage } from "../../lib/aiUsageLog";
 
 export const runtime = "edge";
 
@@ -91,7 +92,6 @@ export default async function handler(req: Request) {
     };
     const rawLease = data.choices?.[0]?.message?.content?.trim();
     if (data.usage) {
-      const { logAiUsage } = await import("../../../lib/aiUsageLog");
       logAiUsage("generate_lease", "gpt-4o-mini", data.usage);
     }
     if (!rawLease) return json({ error: "Empty response from AI. Please try again." }, 502);

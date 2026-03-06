@@ -83,7 +83,6 @@ export default async function handler(req: Request) {
   }
 
   const db = getAdminClient();
-  const env = getEnv();
 
   if (event.type === "payment_intent.succeeded") {
     const obj = event.data?.object as { metadata?: { rentPaymentId?: string; paymentId?: string } };

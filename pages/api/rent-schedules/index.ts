@@ -85,7 +85,7 @@ export default async function handler(req: Request) {
     return json({ error: "Invalid JSON" }, 400);
   }
 
-  const propertyId = typeof body.propertyId === "string" ? body.propertyId.trim() : "";
+  const postPropertyId = typeof body.propertyId === "string" ? body.propertyId.trim() : "";
   const amountCents = typeof body.amountCents === "number" ? body.amountCents : Number(body.amountCents);
   const dueDayOfMonth = typeof body.dueDayOfMonth === "number" ? body.dueDayOfMonth : Math.min(28, Math.max(1, Number(body.dueDayOfMonth) || 1));
   const lateFeeCents = typeof body.lateFeeCents === "number" ? body.lateFeeCents : Number(body.lateFeeCents) || 5000;
@@ -94,10 +94,10 @@ export default async function handler(req: Request) {
   const tenantId = body.tenantId ? String(body.tenantId).trim() : null;
   const applicationId = body.applicationId ? String(body.applicationId).trim() : null;
 
-  if (!propertyId || !amountCents || amountCents < 1) return json({ error: "propertyId and amountCents required" }, 400);
+  if (!postPropertyId || !amountCents || amountCents < 1) return json({ error: "propertyId and amountCents required" }, 400);
 
   const admin = getAdminClient();
-  const { data: property } = await admin.from("properties").select("id, landlord_id").eq("id", propertyId).maybeSingle();
+  const { data: property } = await admin.from("properties").select("id, landlord_id").eq("id", postPropertyId).maybeSingle();
   if (!property || (property as { landlord_id: string }).landlord_id !== auth.landlordId) {
     return json({ error: "Property not found or access denied" }, 404);
   }
@@ -106,7 +106,7 @@ export default async function handler(req: Request) {
     .from("rent_schedules")
     .insert({
       landlord_id: auth.landlordId,
-      property_id: propertyId,
+      property_id: postPropertyId,
       tenant_id: tenantId,
       application_id: applicationId,
       amount_cents: amountCents,
