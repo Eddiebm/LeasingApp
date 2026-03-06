@@ -47,7 +47,7 @@ export async function getLandlordOrAdmin(req: {
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const env = getEnv();
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://seedtvpyhmzskkdlnblg.supabase.co";
-  const supabaseAnon = env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ?? "";
+  const supabaseAnon = env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ?? "sb_publishable_KUY0YWTlIfqPW20phruqiw_B75TXglU";
   if (!token || !supabaseUrl || !supabaseAnon) return null;
 
   const authClient = createClient(supabaseUrl, supabaseAnon);
