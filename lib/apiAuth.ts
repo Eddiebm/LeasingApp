@@ -94,8 +94,11 @@ export async function getDashboardUser(req: {
  */
 export function getAdminClient(): SupabaseClient {
   const env = getEnv();
-  const url = env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://seedtvpyhmzskkdlnblg.supabase.co";
-  // Use || not ?? so empty string env vars also fall back to hardcoded key
+  // Use || not ?? so empty string env vars also fall back to hardcoded values
+  const url =
+    env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    "https://seedtvpyhmzskkdlnblg.supabase.co";
   const key =
     env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
