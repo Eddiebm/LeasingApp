@@ -95,6 +95,10 @@ export async function getDashboardUser(req: {
 export function getAdminClient(): SupabaseClient {
   const env = getEnv();
   const url = env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://seedtvpyhmzskkdlnblg.supabase.co";
-  const key = env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  return createClient(url, key);
+  const key =
+    env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    // Hardcoded fallback: Cloudflare Pages env vars not reliably available at runtime
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlZWR0dnB5aG16c2trZGxuYmxnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY2MDA3NiwiZXhwIjoyMDg4MjM2MDc2fQ.RbroCKolt6mJOwqNSJOQXKcpIAaLeH5eTvbYsIayFZg";
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
