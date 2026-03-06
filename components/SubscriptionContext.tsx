@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
-import { isProSubscriber } from "../lib/subscription";
+import { isProSubscriber, DEFAULT_COUNTRY } from "../lib/subscription";
 
 type SubscriptionContextValue = {
   subscription_status: string | null | undefined;
@@ -12,7 +12,7 @@ type SubscriptionContextValue = {
 const SubscriptionContext = createContext<SubscriptionContextValue>({
   subscription_status: "inactive",
   isPro: false,
-  country: "UK",
+  country: DEFAULT_COUNTRY,
 });
 
 export function useSubscription(): SubscriptionContextValue {

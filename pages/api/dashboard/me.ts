@@ -1,4 +1,5 @@
 import { getLandlordOrAdmin } from "../../../lib/apiAuth";
+import { DEFAULT_COUNTRY } from "../../../lib/subscription";
 
 export const runtime = "edge";
 
@@ -33,6 +34,6 @@ export default async function handler(req: Request) {
     email: auth.email,
     landlord,
     subscription_status: landlord.subscription_status ?? "inactive",
-    country: landlord.country ?? "UK",
+    country: (landlord.country as "US" | "UK") ?? DEFAULT_COUNTRY,
   }, 200);
 }

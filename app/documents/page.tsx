@@ -163,7 +163,7 @@ function DocumentsPageInner() {
         <div className="flex-1 space-y-4 mb-6 min-h-0 overflow-y-auto">
           {messages.length === 0 && !showPreview && !showPaidFlow && (
             <p className="text-slate-500 text-sm">
-              e.g. “I need a lease for my flat in London” or “My tenant hasn’t paid rent for 2 months”
+              e.g. “I need a lease for my apartment in London” or “My tenant hasn’t paid rent for 2 months”
             </p>
           )}
 

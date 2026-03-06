@@ -71,7 +71,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const subscriptionStatus = meData?.subscription_status ?? "inactive";
-  const country = meData?.country ?? "UK";
+  const country = (meData?.country as "US" | "UK") ?? "US";
   const showBanner = !skipAuthCheck && pathname !== "/dashboard/onboarding";
 
   return (

@@ -1,5 +1,7 @@
 export type SubscriptionStatus = "active" | "trialing" | "inactive" | "canceled" | "past_due";
 
+export const DEFAULT_COUNTRY = "US" as const;
+
 export function isProSubscriber(status: string | null | undefined): boolean {
   return status === "active" || status === "trialing";
 }

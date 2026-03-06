@@ -10,7 +10,7 @@ export default function DashboardOnboardingPage() {
   const [companyName, setCompanyName] = useState("");
   const [phone, setPhone] = useState("");
   const [slug, setSlug] = useState("");
-  const [country, setCountry] = useState<"UK" | "US">("UK");
+  const [country, setCountry] = useState<"UK" | "US">("US");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -65,18 +65,8 @@ export default function DashboardOnboardingPage() {
         )}
         <fieldset className="space-y-2">
           <legend className="mb-1 block text-sm font-medium text-slate-700">
-            Where are your properties located?
+            Where are your rental properties located?
           </legend>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input
-              type="radio"
-              name="country"
-              value="UK"
-              checked={country === "UK"}
-              onChange={() => setCountry("UK")}
-            />
-            <span>United Kingdom</span>
-          </label>
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
               type="radio"
@@ -86,6 +76,16 @@ export default function DashboardOnboardingPage() {
               onChange={() => setCountry("US")}
             />
             <span>United States</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="radio"
+              name="country"
+              value="UK"
+              checked={country === "UK"}
+              onChange={() => setCountry("UK")}
+            />
+            <span>United Kingdom</span>
           </label>
         </fieldset>
 

@@ -248,7 +248,7 @@ function GenerateLeasePageInner() {
           AI Lease Generator
         </h1>
         <p className="mt-1 text-slate-600">
-          Create a legally accurate tenancy agreement for UK or US properties in minutes.
+          Create a legally accurate lease agreement for US or UK properties in minutes.
         </p>
 
         {/* Step progress bar */}

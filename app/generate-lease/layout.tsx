@@ -1,7 +1,7 @@
 export const metadata = {
-  title: "AI Lease Generator | Free Tenancy Agreement for UK & US | Bannerman Leasing",
+  title: "AI Lease Generator | Free Lease Agreement for US & UK | Bannerman Leasing",
   description:
-    "Create a legally accurate residential tenancy agreement for UK or US properties in minutes. AI-powered lease generator for landlords. No login required.",
+    "Create a legally accurate residential lease agreement for US or UK properties in minutes. AI-powered lease generator for landlords. No login required.",
 };
 
 export default function GenerateLeaseLayout({

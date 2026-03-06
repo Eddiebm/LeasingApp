@@ -27,14 +27,14 @@ function getSavingsCopy(feature: string, country: "UK" | "US"): { title: string;
   if (lower.includes("eviction")) {
     return {
       title: `${name} — Pro Feature`,
-      body: `This assistant prepares the right eviction notice for your jurisdiction, saving ${evictionRange} in solicitor fees.`,
+      body: `This assistant prepares the right eviction notice for your jurisdiction, saving ${evictionRange} in attorney or legal fees.`,
       payoff: "One notice often covers several months of Pro."
     };
   }
   if (lower.includes("document")) {
     return {
       title: `${name} — Pro Feature`,
-      body: "AI Document Hub replaces your letting agent’s document service with on-demand, reusable templates.",
+      body: "AI Document Hub replaces your property manager’s document service with on-demand, reusable templates.",
       payoff: "Using it for a few tenancies a year pays for Pro many times over."
     };
   }

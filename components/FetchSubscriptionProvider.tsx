@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { SubscriptionProvider } from "./SubscriptionContext";
+import { DEFAULT_COUNTRY } from "../lib/subscription";
 
 /**
  * Use on pages outside the dashboard (e.g. /generate-lease, /documents, /eviction)
@@ -10,7 +11,7 @@ import { SubscriptionProvider } from "./SubscriptionContext";
  */
 export function FetchSubscriptionProvider({ children }: { children: ReactNode }) {
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>("inactive");
-  const [country, setCountry] = useState<"UK" | "US">("UK");
+  const [country, setCountry] = useState<"UK" | "US">(DEFAULT_COUNTRY);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -24,7 +25,7 @@ export function FetchSubscriptionProvider({ children }: { children: ReactNode })
         .then((r) => r.json())
         .then((data) => {
           setSubscriptionStatus(data.subscription_status ?? data.landlord?.subscription_status ?? "inactive");
-          setCountry((data.country as "UK" | "US") ?? "UK");
+          setCountry((data.country as "UK" | "US") ?? DEFAULT_COUNTRY);
         })
         .catch(() => setSubscriptionStatus("inactive"));
     });
