@@ -19,8 +19,9 @@ export default function BillingPage() {
   const [session, setSession] = useState<{ access_token: string } | null>(null);
   const [landlord, setLandlord] = useState<LandlordBilling | null>(null);
   const [loading, setLoading] = useState(true);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState<"gbp" | "usd" | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [leasesPerYear, setLeasesPerYear] = useState<1 | 2 | 3 | 5>(1);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => setSession(s ?? null));
@@ -37,13 +38,17 @@ export default function BillingPage() {
       .finally(() => setLoading(false));
   }, [session?.access_token]);
 
-  const handleSubscribe = async () => {
+  const handleSubscribe = async (currency: "gbp" | "usd") => {
     if (!session?.access_token) return;
-    setCheckoutLoading(true);
+    setCheckoutLoading(currency);
     try {
       const res = await fetch("/api/billing/create-checkout-session", {
         method: "POST",
-        headers: { Authorization: `Bearer ${session.access_token}` }
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ currency }),
       });
       const data = await res.json().catch(() => ({}));
       if (data.url) window.location.href = data.url;
@@ -52,7 +57,7 @@ export default function BillingPage() {
       console.error(e);
       alert("Something went wrong.");
     } finally {
-      setCheckoutLoading(false);
+      setCheckoutLoading(null);
     }
   };
 
@@ -84,6 +89,9 @@ export default function BillingPage() {
   }
 
   const dashboardTitle = landlord?.company_name ? `${landlord.company_name} – Billing` : "Billing";
+  const savingsPerLease = 200; // £200 saved per lease (conservative)
+  const yearlySavings = leasesPerYear * savingsPerLease;
+  const paysForItselfMonths = Math.max(1, Math.round(7 / leasesPerYear)); // 1 lease ~7 months of Pro
 
   return (
     <main className="space-y-6">
@@ -111,20 +119,21 @@ export default function BillingPage() {
         </div>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
         {loading ? (
           <p className="text-sm text-slate-500">Loading…</p>
         ) : (
           <>
-            <h2 className="mb-4 text-sm font-semibold text-slate-800">Subscription</h2>
             {landlord?.subscription_status && landlord.subscription_status !== "inactive" && landlord.subscription_status !== "canceled" ? (
               <div className="space-y-3">
-                <p className="text-sm text-slate-600">
-                  Status: <span className="font-medium capitalize">{landlord.subscription_status}</span>
+                <h2 className="text-sm font-semibold text-slate-800">Your plan</h2>
+                <p className="text-sm text-slate-700">
+                  <span className="mr-2">✓</span>
+                  <span className="font-medium">Pro Plan — Active</span>
                 </p>
                 {landlord.subscription_current_period_end && (
                   <p className="text-sm text-slate-600">
-                    Current period ends:{" "}
+                    Next billing date:{" "}
                     {new Date(landlord.subscription_current_period_end).toLocaleDateString()}
                   </p>
                 )}
@@ -138,16 +147,71 @@ export default function BillingPage() {
                 </button>
               </div>
             ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-slate-600">You don’t have an active subscription.</p>
-                <button
-                  type="button"
-                  onClick={handleSubscribe}
-                  disabled={checkoutLoading}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-                >
-                  {checkoutLoading ? "Redirecting…" : "Subscribe"}
-                </button>
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <h2 className="text-base font-semibold text-slate-900">Upgrade to Bannerman Leasing Pro</h2>
+                  <p className="mt-2 text-sm text-slate-700">
+                    One AI-generated lease saves you £150–£500 in solicitor fees. Pro costs £19.99/month.
+                  </p>
+                  <ul className="mt-4 space-y-1 text-sm text-slate-800">
+                    <li>✓ Unlimited properties</li>
+                    <li>✓ AI Lease Generator (UK & US)</li>
+                    <li>✓ AI Document Hub</li>
+                    <li>✓ Eviction Notice Generator</li>
+                    <li>✓ Tenant Screening &amp; Passport</li>
+                    <li>✓ Priority support</li>
+                  </ul>
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSubscribe("gbp")}
+                      disabled={checkoutLoading === "gbp"}
+                      className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      {checkoutLoading === "gbp" ? "Redirecting…" : "Upgrade — £19.99/month (UK)"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSubscribe("usd")}
+                      disabled={checkoutLoading === "usd"}
+                      className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-900 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      {checkoutLoading === "usd" ? "Redirecting…" : "Upgrade — $24.99/month (US)"}
+                    </button>
+                  </div>
+                  <p className="mt-3 text-xs text-slate-500">
+                    Cancel anytime. No long-term commitment. Prices shown in GBP (UK) and USD (US). Billed monthly via Stripe.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                  <h3 className="text-sm font-semibold text-slate-900">See how quickly Pro pays for itself</h3>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-700">
+                    <span>How many leases do you generate per year?</span>
+                    {[1, 2, 3, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setLeasesPerYear(n as 1 | 2 | 3 | 5)}
+                        className={`rounded-full px-3 py-1 text-xs font-medium border ${
+                          leasesPerYear === n
+                            ? "border-slate-900 bg-slate-900 text-white"
+                            : "border-slate-300 bg-white text-slate-700"
+                        }`}
+                      >
+                        {n === 5 ? "5+" : n}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-sm text-slate-700">
+                    You'd save approximately <span className="font-semibold">£{yearlySavings.toLocaleString()}</span> per year versus solicitor fees.
+                  </p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    Pro pays for itself in about{" "}
+                    <span className="font-semibold">{paysForItselfMonths}</span> month
+                    {paysForItselfMonths === 1 ? "" : "s"} at this usage.
+                  </p>
+                </div>
               </div>
             )}
           </>

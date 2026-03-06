@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { FetchSubscriptionProvider } from "../../components/FetchSubscriptionProvider";
+import { ProGate } from "../../components/ProGate";
 
 const UK_TENANCY_TYPES = [
   "Assured Shorthold Tenancy",
@@ -159,11 +161,13 @@ export default function EvictionPage() {
     answers.reason?.toLowerCase().includes("payment");
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-xl">
-        <Link href="/" className="text-sm text-slate-500 hover:text-slate-700">
-          ← Back to home
-        </Link>
+    <FetchSubscriptionProvider>
+      <ProGate feature="Eviction Notice Generator">
+        <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-xl">
+            <Link href="/" className="text-sm text-slate-500 hover:text-slate-700">
+              ← Back to home
+            </Link>
 
         <h1 className="mt-4 text-2xl font-bold text-slate-900 sm:text-3xl">
           AI Eviction Assistant
@@ -531,7 +535,9 @@ export default function EvictionPage() {
         <p className="mt-6 text-center text-xs text-slate-500">
           AI-generated documents are for informational purposes only and do not constitute legal advice.
         </p>
-      </div>
-    </main>
+          </div>
+        </main>
+      </ProGate>
+    </FetchSubscriptionProvider>
   );
 }

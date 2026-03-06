@@ -2,14 +2,35 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "../../lib/supabaseClient";
+import { SubscriptionProvider, useSubscription } from "../../components/SubscriptionContext";
 
 const LOGIN_SIGNUP_PATHS = ["/dashboard/login", "/dashboard/signup"];
+
+function FreePlanBanner() {
+  const { isPro } = useSubscription();
+  if (isPro) return null;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs sm:text-sm text-amber-900">
+      <span className="font-medium">
+        Free plan · 1 property included
+      </span>
+      <Link
+        href="/dashboard/billing"
+        className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-amber-700"
+      >
+        Upgrade to Pro →
+      </Link>
+    </div>
+  );
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [checking, setChecking] = useState(true);
+  const [meData, setMeData] = useState<{ subscription_status?: string | null; needsOnboarding?: boolean; role?: string } | null>(null);
   const skipAuthCheck = LOGIN_SIGNUP_PATHS.some((p) => pathname === p);
 
   useEffect(() => {
@@ -28,6 +49,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         const data = await res.json().catch(() => ({}));
+        setMeData(data);
         if (data.needsOnboarding && pathname !== "/dashboard/onboarding") {
           router.replace("/dashboard/onboarding");
         } else if (pathname === "/dashboard/onboarding" && data.role) {
@@ -48,5 +70,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
-  return <>{children}</>;
+  const subscriptionStatus = meData?.subscription_status ?? "inactive";
+  const showBanner = !skipAuthCheck && pathname !== "/dashboard/onboarding";
+
+  return (
+    <SubscriptionProvider subscription_status={subscriptionStatus}>
+      {showBanner && <FreePlanBanner />}
+      {children}
+    </SubscriptionProvider>
+  );
 }

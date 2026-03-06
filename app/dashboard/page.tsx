@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import TenantCard from "../../components/TenantCard";
 import MaintenanceCard from "../../components/MaintenanceCard";
+import { useSubscription } from "../../components/SubscriptionContext";
+import { FREE_PROPERTY_LIMIT } from "../../lib/subscription";
 import { supabase } from "../../lib/supabaseClient";
 
 type Property = { id: string; address: string; city: string; state: string; zip: string; rent?: number };
@@ -125,6 +127,7 @@ function validateCsvRow(row: ParsedCsvRow, index: number): string | null {
 
 export default function Dashboard() {
   const router = useRouter();
+  const { isPro } = useSubscription();
   const [session, setSession] = useState<{ access_token: string; user?: { email?: string } } | null>(null);
   const [landlord, setLandlord] = useState<LandlordProfile | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
@@ -423,66 +426,83 @@ export default function Dashboard() {
       )}
 
       <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-slate-800">Add a property</h2>
-          <button
-            type="button"
-            onClick={() => {
-              setCsvModalOpen(true);
-              setCsvUploadError(null);
-              setCsvRows([]);
-              setCsvRowErrors([]);
-            }}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Upload Properties (CSV)
-          </button>
-        </div>
-        <form onSubmit={handleCreateProperty} className="mt-2 grid gap-2 md:grid-cols-5">
-          <input
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            placeholder="Address"
-            value={propertyForm.address}
-            onChange={(e) => setPropertyForm({ ...propertyForm, address: e.target.value })}
-          />
-          <input
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            placeholder="City"
-            value={propertyForm.city}
-            onChange={(e) => setPropertyForm({ ...propertyForm, city: e.target.value })}
-          />
-          <input
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            placeholder="State"
-            value={propertyForm.state}
-            onChange={(e) => setPropertyForm({ ...propertyForm, state: e.target.value })}
-          />
-          <input
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            placeholder="ZIP"
-            value={propertyForm.zip}
-            onChange={(e) => setPropertyForm({ ...propertyForm, zip: e.target.value })}
-          />
-          <div className="flex items-center gap-2">
-            <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              placeholder="Rent (per month)"
-              value={propertyForm.rent}
-              onChange={(e) => setPropertyForm({ ...propertyForm, rent: e.target.value })}
-            />
-            <button
-              type="submit"
-              disabled={creatingProperty}
-              className="whitespace-nowrap rounded-lg bg-black px-3 py-2 text-xs font-medium text-white disabled:opacity-60"
+        <h2 className="text-sm font-semibold text-slate-800">Add a property</h2>
+        {!isPro && properties.length >= FREE_PROPERTY_LIMIT ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-medium text-amber-900">Free plan limit reached</p>
+            <p className="mt-1 text-sm text-amber-800">
+              You can have up to {FREE_PROPERTY_LIMIT} properties on the free plan. Upgrade to Pro for unlimited properties.
+            </p>
+            <Link
+              href="/dashboard/billing"
+              className="mt-3 inline-block rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
             >
-              {creatingProperty ? "Saving…" : "Add"}
-            </button>
+              Upgrade to Pro
+            </Link>
           </div>
-        </form>
-        {properties.length === 0 && (
-          <p className="mt-2 text-xs text-slate-500">
-            Add your first property above. Your apply link will show these listings to applicants.
-          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setCsvModalOpen(true);
+                  setCsvUploadError(null);
+                  setCsvRows([]);
+                  setCsvRowErrors([]);
+                }}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Upload Properties (CSV)
+              </button>
+            </div>
+            <form onSubmit={handleCreateProperty} className="mt-2 grid gap-2 md:grid-cols-5">
+              <input
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                placeholder="Address"
+                value={propertyForm.address}
+                onChange={(e) => setPropertyForm({ ...propertyForm, address: e.target.value })}
+              />
+              <input
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                placeholder="City"
+                value={propertyForm.city}
+                onChange={(e) => setPropertyForm({ ...propertyForm, city: e.target.value })}
+              />
+              <input
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                placeholder="State"
+                value={propertyForm.state}
+                onChange={(e) => setPropertyForm({ ...propertyForm, state: e.target.value })}
+              />
+              <input
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                placeholder="ZIP"
+                value={propertyForm.zip}
+                onChange={(e) => setPropertyForm({ ...propertyForm, zip: e.target.value })}
+              />
+              <div className="flex items-center gap-2">
+                <input
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Rent (per month)"
+                  value={propertyForm.rent}
+                  onChange={(e) => setPropertyForm({ ...propertyForm, rent: e.target.value })}
+                />
+                <button
+                  type="submit"
+                  disabled={creatingProperty}
+                  className="whitespace-nowrap rounded-lg bg-black px-3 py-2 text-xs font-medium text-white disabled:opacity-60"
+                >
+                  {creatingProperty ? "Saving…" : "Add"}
+                </button>
+              </div>
+            </form>
+            {properties.length === 0 && (
+              <p className="mt-2 text-xs text-slate-500">
+                Add your first property above. Your apply link will show these listings to applicants.
+              </p>
+            )}
+          </>
         )}
       </section>
 

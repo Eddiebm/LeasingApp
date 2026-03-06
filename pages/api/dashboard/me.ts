@@ -27,9 +27,11 @@ export default async function handler(req: Request) {
     return json({ role: "admin", email: auth.email }, 200);
   }
 
+  const landlord = auth.landlord!;
   return json({
     role: "landlord",
     email: auth.email,
-    landlord: auth.landlord,
+    landlord,
+    subscription_status: landlord.subscription_status ?? "inactive",
   }, 200);
 }

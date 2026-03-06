@@ -1,4 +1,5 @@
 import { getLandlordOrAdmin, getAdminClient } from "../../../lib/apiAuth";
+import { isProSubscriber, FREE_PROPERTY_LIMIT } from "../../../lib/subscription";
 
 export const runtime = "edge";
 
@@ -77,21 +78,27 @@ function validateRow(row: PropertyInput, index: number): { ok: true; data: Valid
 export default async function handler(req: Request) {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
+  let body: { properties?: unknown; landlordId?: string } = {};
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "Invalid JSON body." }, 400);
+  }
+
   const auth = await getLandlordOrAdmin(req);
   if (!auth) return json({ error: "Unauthorized" }, 401);
 
   let landlordId: string | null = null;
   if (auth.role === "landlord") {
     landlordId = auth.landlordId;
-  } else if (auth.role === "admin" && (body as Record<string, unknown>)?.landlordId) {
-    landlordId = String((body as Record<string, unknown>).landlordId);
+  } else if (auth.role === "admin" && body.landlordId) {
+    landlordId = String(body.landlordId);
   }
   if (!landlordId) {
     return json({ error: "A landlord is required for these properties." }, 400);
   }
 
-
-  const raw = (body as { properties?: unknown }).properties;
+  const raw = body.properties;
   if (!Array.isArray(raw)) {
     return json({ error: "Request body must include a 'properties' array." }, 400);
   }
@@ -104,9 +111,33 @@ export default async function handler(req: Request) {
     else errors.push(result.error);
   }
 
+  const supabase = getAdminClient();
+  if (auth.role === "landlord" && toInsert.length > 0) {
+    const { count } = await supabase
+      .from("properties")
+      .select("id", { count: "exact", head: true })
+      .eq("landlord_id", landlordId);
+    const { data: landlordRow } = await supabase
+      .from("landlords")
+      .select("subscription_status")
+      .eq("id", landlordId)
+      .single();
+    const isPro = isProSubscriber(landlordRow?.subscription_status);
+    const currentCount = count ?? 0;
+    if (!isPro && currentCount + toInsert.length > FREE_PROPERTY_LIMIT) {
+      return json(
+        {
+          error: "Free plan limit reached. Upgrade to Pro to add unlimited properties.",
+          inserted: 0,
+          errors,
+        },
+        403
+      );
+    }
+  }
+
   let inserted = 0;
   if (toInsert.length > 0) {
-    const supabase = getAdminClient();
     const rows = toInsert.map((p) => ({
       landlord_id: landlordId,
       address: p.address,

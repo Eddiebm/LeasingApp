@@ -23,7 +23,8 @@ Use `.env.local` for local dev. For Cloudflare Pages, set variables in the dashb
 | `EMAIL_FROM` | Local + CF | Sender for Resend (e.g. `Bannerman Leasing <noreply@yourdomain.com>`). Defaults to Resend onboarding address. |
 | `CHECKR_API_KEY` / `RENTPREP_API_KEY` | Local + CF | For real screening in `lib/runScreening.ts` (otherwise mocked) |
 | `SCREENING_FEE_CENTS` | Local + CF | Screening fee in cents (tenant pays). Default 3500 ($35). |
-| `STRIPE_SUBSCRIPTION_PRICE_ID` | Local + CF (server only) | Stripe Price ID for landlord SaaS subscription (e.g. `price_xxx`). Required for /dashboard/billing. |
+| `STRIPE_SUBSCRIPTION_PRICE_ID` | Local + CF (server only) | Stripe Price ID for landlord SaaS subscription in GBP (e.g. `price_xxx`). Used when currency is GBP. |
+| `STRIPE_SUBSCRIPTION_PRICE_ID_USD` | Local + CF (server only) | Stripe Price ID for US landlords ($24.99/month). Same product as GBP; used when currency is USD. |
 | `OPENAI_API_KEY` | Local + CF (server only) | OpenAI API key for AI-generated state-specific leases and eviction notices. If set, documents generated with `stateCode` and `useAi: true` use GPT-4o-mini. Optional. |
 
 ## GitHub Actions

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { FetchSubscriptionProvider } from "../../components/FetchSubscriptionProvider";
+import { ProGate } from "../../components/ProGate";
 
 const US_STATES = [
   "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
@@ -675,8 +677,12 @@ function GenerateLeasePageInner() {
 
 export default function GenerateLeasePage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center"><p className="text-slate-400">Loading...</p></div>}>
-      <GenerateLeasePageInner />
-    </Suspense>
+    <FetchSubscriptionProvider>
+      <ProGate feature="AI Lease Generator">
+        <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center"><p className="text-slate-400">Loading...</p></div>}>
+          <GenerateLeasePageInner />
+        </Suspense>
+      </ProGate>
+    </FetchSubscriptionProvider>
   );
 }

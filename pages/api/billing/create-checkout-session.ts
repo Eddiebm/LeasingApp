@@ -19,9 +19,20 @@ export default async function handler(req: Request) {
     return json({ error: "Unauthorized" }, 401);
   }
 
+  let body: { currency?: string } = {};
+  try {
+    body = await req.json();
+  } catch {
+    /* empty */
+  }
+  const currency = (body.currency ?? "gbp").toLowerCase() === "usd" ? "usd" : "gbp";
+
   const env = getEnv();
   const stripeKey = env.STRIPE_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY;
-  const priceId = env.STRIPE_SUBSCRIPTION_PRICE_ID ?? process.env.STRIPE_SUBSCRIPTION_PRICE_ID;
+  const priceId =
+    currency === "usd"
+      ? (env.STRIPE_SUBSCRIPTION_PRICE_ID_USD ?? process.env.STRIPE_SUBSCRIPTION_PRICE_ID_USD)
+      : (env.STRIPE_SUBSCRIPTION_PRICE_ID ?? process.env.STRIPE_SUBSCRIPTION_PRICE_ID);
 
   if (!stripeKey || !priceId) {
     return json({ error: "Billing not configured" }, 503);

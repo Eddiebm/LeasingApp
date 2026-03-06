@@ -1,5 +1,6 @@
-import { getSupabaseServer } from "../../../lib/supabaseServer";
+import { getAdminClient } from "../../../lib/apiAuth";
 import { getLandlordOrAdmin } from "../../../lib/apiAuth";
+import { isProSubscriber, FREE_PROPERTY_LIMIT } from "../../../lib/subscription";
 
 export const runtime = "edge";
 
@@ -52,7 +53,27 @@ export default async function handler(req: Request) {
     return json({ error: "A landlord is required for this property." }, 400);
   }
 
-  const { data, error } = await getSupabaseServer()
+  const db = getAdminClient();
+  if (auth.role === "landlord") {
+    const { count } = await db
+      .from("properties")
+      .select("id", { count: "exact", head: true })
+      .eq("landlord_id", landlordId);
+    const { data: landlordRow } = await db
+      .from("landlords")
+      .select("subscription_status")
+      .eq("id", landlordId)
+      .single();
+    const isPro = isProSubscriber(landlordRow?.subscription_status);
+    if (!isPro && (count ?? 0) >= FREE_PROPERTY_LIMIT) {
+      return json(
+        { error: "Free plan limit reached. Upgrade to Pro to add unlimited properties." },
+        403
+      );
+    }
+  }
+
+  const { data, error } = await db
     .from("properties")
     .insert({
       landlord_id: landlordId,

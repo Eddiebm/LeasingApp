@@ -1,7 +1,10 @@
 "use client";
+
 import Link from "next/link";
 import { useState, useRef, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { FetchSubscriptionProvider } from "../../components/FetchSubscriptionProvider";
+import { ProGate } from "../../components/ProGate";
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -278,8 +281,12 @@ function DocumentsPageInner() {
 
 export default function DocumentsPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center"><p className="text-slate-400">Loading...</p></div>}>
-      <DocumentsPageInner />
-    </Suspense>
+    <FetchSubscriptionProvider>
+      <ProGate feature="AI Document Hub">
+        <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center"><p className="text-slate-400">Loading...</p></div>}>
+          <DocumentsPageInner />
+        </Suspense>
+      </ProGate>
+    </FetchSubscriptionProvider>
   );
 }
