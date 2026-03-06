@@ -10,6 +10,7 @@ import { SubscriptionProvider } from "./SubscriptionContext";
  */
 export function FetchSubscriptionProvider({ children }: { children: ReactNode }) {
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>("inactive");
+  const [country, setCountry] = useState<"UK" | "US">("UK");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -23,13 +24,14 @@ export function FetchSubscriptionProvider({ children }: { children: ReactNode })
         .then((r) => r.json())
         .then((data) => {
           setSubscriptionStatus(data.subscription_status ?? data.landlord?.subscription_status ?? "inactive");
+          setCountry((data.country as "UK" | "US") ?? "UK");
         })
         .catch(() => setSubscriptionStatus("inactive"));
     });
   }, []);
 
   return (
-    <SubscriptionProvider subscription_status={subscriptionStatus}>
+    <SubscriptionProvider subscription_status={subscriptionStatus} country={country}>
       {children}
     </SubscriptionProvider>
   );

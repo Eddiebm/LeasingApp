@@ -33,5 +33,6 @@ export default async function handler(req: Request) {
     email: auth.email,
     landlord,
     subscription_status: landlord.subscription_status ?? "inactive",
+    country: landlord.country ?? "UK",
   }, 200);
 }

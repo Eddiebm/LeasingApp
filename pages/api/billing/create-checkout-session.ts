@@ -19,18 +19,11 @@ export default async function handler(req: Request) {
     return json({ error: "Unauthorized" }, 401);
   }
 
-  let body: { currency?: string } = {};
-  try {
-    body = await req.json();
-  } catch {
-    /* empty */
-  }
-  const currency = (body.currency ?? "gbp").toLowerCase() === "usd" ? "usd" : "gbp";
-
   const env = getEnv();
   const stripeKey = env.STRIPE_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY;
+  const landlordCountry = auth.landlord.country === "US" ? "US" : "UK";
   const priceId =
-    currency === "usd"
+    landlordCountry === "US"
       ? (env.STRIPE_SUBSCRIPTION_PRICE_ID_USD ?? process.env.STRIPE_SUBSCRIPTION_PRICE_ID_USD)
       : (env.STRIPE_SUBSCRIPTION_PRICE_ID ?? process.env.STRIPE_SUBSCRIPTION_PRICE_ID);
 

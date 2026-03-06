@@ -30,7 +30,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const pathname = usePathname();
   const [checking, setChecking] = useState(true);
-  const [meData, setMeData] = useState<{ subscription_status?: string | null; needsOnboarding?: boolean; role?: string } | null>(null);
+  const [meData, setMeData] = useState<{ subscription_status?: string | null; country?: "UK" | "US"; needsOnboarding?: boolean; role?: string } | null>(null);
   const skipAuthCheck = LOGIN_SIGNUP_PATHS.some((p) => pathname === p);
 
   useEffect(() => {
@@ -71,10 +71,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const subscriptionStatus = meData?.subscription_status ?? "inactive";
+  const country = meData?.country ?? "UK";
   const showBanner = !skipAuthCheck && pathname !== "/dashboard/onboarding";
 
   return (
-    <SubscriptionProvider subscription_status={subscriptionStatus}>
+    <SubscriptionProvider subscription_status={subscriptionStatus} country={country}>
       {showBanner && <FreePlanBanner />}
       {children}
     </SubscriptionProvider>

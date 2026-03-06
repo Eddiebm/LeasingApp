@@ -10,6 +10,7 @@ export type LandlordRow = {
   email: string;
   phone: string | null;
   slug: string | null;
+  country?: string | null;
   stripe_customer_id?: string | null;
   subscription_status?: string | null;
   subscription_current_period_end?: string | null;

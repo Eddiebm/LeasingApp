@@ -10,6 +10,7 @@ export default function DashboardOnboardingPage() {
   const [companyName, setCompanyName] = useState("");
   const [phone, setPhone] = useState("");
   const [slug, setSlug] = useState("");
+  const [country, setCountry] = useState<"UK" | "US">("UK");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -33,6 +34,7 @@ export default function DashboardOnboardingPage() {
           companyName: companyName.trim() || undefined,
           phone: phone.trim() || undefined,
           slug: slug.trim() || undefined,
+          country,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -61,6 +63,32 @@ export default function DashboardOnboardingPage() {
             {error}
           </p>
         )}
+        <fieldset className="space-y-2">
+          <legend className="mb-1 block text-sm font-medium text-slate-700">
+            Where are your properties located?
+          </legend>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="radio"
+              name="country"
+              value="UK"
+              checked={country === "UK"}
+              onChange={() => setCountry("UK")}
+            />
+            <span>United Kingdom</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="radio"
+              name="country"
+              value="US"
+              checked={country === "US"}
+              onChange={() => setCountry("US")}
+            />
+            <span>United States</span>
+          </label>
+        </fieldset>
+
         <div>
           <label htmlFor="onboarding-fullName" className="mb-1 block text-sm font-medium text-slate-700">
             Full name *

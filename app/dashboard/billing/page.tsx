@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../../lib/supabaseClient";
+import { useSubscription } from "../../../components/SubscriptionContext";
 
 type LandlordBilling = {
   company_name: string | null;
@@ -16,6 +17,7 @@ type LandlordBilling = {
 export default function BillingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { country } = useSubscription();
   const [session, setSession] = useState<{ access_token: string } | null>(null);
   const [landlord, setLandlord] = useState<LandlordBilling | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,9 +91,10 @@ export default function BillingPage() {
   }
 
   const dashboardTitle = landlord?.company_name ? `${landlord.company_name} – Billing` : "Billing";
-  const savingsPerLease = 200; // £200 saved per lease (conservative)
+  const savingsPerLease = 200; // 200 in local currency
   const yearlySavings = leasesPerYear * savingsPerLease;
   const paysForItselfMonths = Math.max(1, Math.round(7 / leasesPerYear)); // 1 lease ~7 months of Pro
+  const currencySymbol = country === "US" ? "$" : "£";
 
   return (
     <main className="space-y-6">
@@ -150,9 +153,15 @@ export default function BillingPage() {
               <div className="space-y-4">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                   <h2 className="text-base font-semibold text-slate-900">Upgrade to Bannerman Leasing Pro</h2>
-                  <p className="mt-2 text-sm text-slate-700">
-                    One AI-generated lease saves you £150–£500 in solicitor fees. Pro costs £19.99/month.
-                  </p>
+                  {country === "US" ? (
+                    <p className="mt-2 text-sm text-slate-700">
+                      One AI-generated lease saves you $150–$500 in attorney fees. Pro costs $24.99/month.
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-700">
+                      One AI-generated lease saves you £150–£500 in solicitor fees. Pro costs £19.99/month.
+                    </p>
+                  )}
                   <ul className="mt-4 space-y-1 text-sm text-slate-800">
                     <li>✓ Unlimited properties</li>
                     <li>✓ AI Lease Generator (UK & US)</li>
@@ -162,25 +171,28 @@ export default function BillingPage() {
                     <li>✓ Priority support</li>
                   </ul>
                   <div className="mt-5 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleSubscribe("gbp")}
-                      disabled={checkoutLoading === "gbp"}
-                      className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-                    >
-                      {checkoutLoading === "gbp" ? "Redirecting…" : "Upgrade — £19.99/month (UK)"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSubscribe("usd")}
-                      disabled={checkoutLoading === "usd"}
-                      className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-900 hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      {checkoutLoading === "usd" ? "Redirecting…" : "Upgrade — $24.99/month (US)"}
-                    </button>
+                    {country === "US" ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSubscribe("usd")}
+                        disabled={checkoutLoading === "usd"}
+                        className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        {checkoutLoading === "usd" ? "Redirecting…" : "Upgrade — $24.99/month (US)"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleSubscribe("gbp")}
+                        disabled={checkoutLoading === "gbp"}
+                        className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        {checkoutLoading === "gbp" ? "Redirecting…" : "Upgrade — £19.99/month (UK)"}
+                      </button>
+                    )}
                   </div>
                   <p className="mt-3 text-xs text-slate-500">
-                    Cancel anytime. No long-term commitment. Prices shown in GBP (UK) and USD (US). Billed monthly via Stripe.
+                    Cancel anytime. No long-term commitment. You’ll be billed monthly in {country === "US" ? "USD" : "GBP"} via Stripe.
                   </p>
                 </div>
 
@@ -204,7 +216,12 @@ export default function BillingPage() {
                     ))}
                   </div>
                   <p className="mt-3 text-sm text-slate-700">
-                    You'd save approximately <span className="font-semibold">£{yearlySavings.toLocaleString()}</span> per year versus solicitor fees.
+                    You'd save approximately{" "}
+                    <span className="font-semibold">
+                      {currencySymbol}
+                      {yearlySavings.toLocaleString()}
+                    </span>{" "}
+                    per year versus solicitor/attorney fees.
                   </p>
                   <p className="mt-1 text-sm text-slate-700">
                     Pro pays for itself in about{" "}

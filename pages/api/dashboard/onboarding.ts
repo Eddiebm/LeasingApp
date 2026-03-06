@@ -34,7 +34,7 @@ export default async function handler(req: Request) {
     return json({ error: "Already onboarded or unauthorized" }, 400);
   }
 
-  const { fullName, companyName, phone, slug: rawSlug } = body ?? {};
+  const { fullName, companyName, phone, slug: rawSlug, country } = body ?? {};
   const fullNameStr = String(fullName ?? "").trim();
   if (!fullNameStr) return json({ error: "fullName is required" }, 400);
 
@@ -55,6 +55,7 @@ export default async function handler(req: Request) {
       email: auth.email,
       phone: phone ? String(phone).trim() : null,
       slug,
+      country: country === "US" ? "US" : "UK",
     })
     .select("id, slug, company_name")
     .single();

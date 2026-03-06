@@ -1,28 +1,33 @@
-"use client";
+\"use client\";
 
-import Link from "next/link";
+import Link from \"next/link\";
+import { useSubscription } from \"./SubscriptionContext\";
 
-function getSavingsCopy(feature: string): { title: string; body: string; payoff: string } {
+function getSavingsCopy(feature: string, country: "UK" | "US"): { title: string; body: string; payoff: string } {
   const name = feature;
   const lower = feature.toLowerCase();
+  const currencySymbol = country === "US" ? "$" : "£";
+  const leaseRange = country === "US" ? "$150–$500" : "£150–£500";
+  const screeningRange = country === "US" ? "$20–$30" : "£20–£30";
+  const evictionRange = country === "US" ? "$100–$300" : "£100–£300";
   if (lower.includes("lease")) {
     return {
       title: `${name} — Pro Feature`,
-      body: "This tool generates legally accurate UK and US tenancy agreements in minutes, saving £150–£500 per lease.",
+      body: `This tool generates legally accurate UK and US tenancy agreements in minutes, saving ${leaseRange} per lease.`,
       payoff: "One lease pays for around 7 months of Pro."
     };
   }
   if (lower.includes("screening") || lower.includes("passport")) {
     return {
       title: `${name} — Pro Feature`,
-      body: "Tenant screening and the Tenant Passport save £20–£30 per reference while giving you instant, reusable reports.",
+      body: `Tenant screening and the Tenant Passport save ${screeningRange} per reference while giving you instant, reusable reports.`,
       payoff: "Screen 2–3 tenants and Pro has paid for itself."
     };
   }
   if (lower.includes("eviction")) {
     return {
       title: `${name} — Pro Feature`,
-      body: "This assistant prepares the right eviction notice for your jurisdiction, saving £100–£300 in solicitor fees.",
+      body: `This assistant prepares the right eviction notice for your jurisdiction, saving ${evictionRange} in solicitor fees.`,
       payoff: "One notice often covers several months of Pro."
     };
   }
@@ -41,7 +46,8 @@ function getSavingsCopy(feature: string): { title: string; body: string; payoff:
 }
 
 export function UpgradePrompt({ feature, onClose }: { feature: string; onClose: () => void }) {
-  const { title, body, payoff } = getSavingsCopy(feature);
+  const { country } = useSubscription();
+  const { title, body, payoff } = getSavingsCopy(feature, country);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
