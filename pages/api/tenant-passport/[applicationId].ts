@@ -1,7 +1,13 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { getLandlordOrAdmin, getAdminClient } from "../../../lib/apiAuth";
 
 export const runtime = "edge";
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
 
 type PassportSummary = {
   tenantId: string;
@@ -16,36 +22,31 @@ type PassportSummary = {
   passportExpiryDate: string | null;
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+export default async function handler(req: Request) {
+  if (req.method !== "GET") return json({ error: "Method not allowed" }, 405);
 
-  const { applicationId } = req.query;
-  if (typeof applicationId !== "string" || !applicationId.trim()) {
-    return res.status(400).json({ error: "applicationId required" });
+  const url = new URL(req.url);
+  const pathSegments = url.pathname.split("/").filter(Boolean);
+  const applicationId = pathSegments[pathSegments.length - 1] ?? "";
+  if (!applicationId.trim()) {
+    return json({ error: "applicationId required" }, 400);
   }
 
   const auth = await getLandlordOrAdmin(req);
   if (!auth || (auth.role !== "landlord" && auth.role !== "admin")) {
-    return res.status(401).json({ error: "Unauthorized" });
+    return json({ error: "Unauthorized" }, 401);
   }
 
   const supabase = getAdminClient();
 
-  // Resolve tenant for this application and ensure landlord owns it (if not admin).
   const { data: app, error: appError } = await supabase
     .from("applications")
-    .select(
-      `
-      id,
-      tenant_id,
-      properties ( landlord_id )
-    `
-    )
+    .select("id, tenant_id, properties ( landlord_id )")
     .eq("id", applicationId.trim())
     .single();
 
   if (appError || !app) {
-    return res.status(404).json({ error: "Application not found" });
+    return json({ error: "Application not found" }, 404);
   }
 
   const a = app as {
@@ -58,31 +59,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const landlordId = auth.landlord?.id ?? null;
     const appLandlordId = a.properties?.landlord_id ?? null;
     if (!landlordId || !appLandlordId || landlordId !== appLandlordId) {
-      return res.status(403).json({ error: "Forbidden" });
+      return json({ error: "Forbidden" }, 403);
     }
   }
 
   const tenantId = a.tenant_id;
   if (!tenantId) {
-    return res.status(404).json({ error: "No tenant linked to this application" });
+    return json({ error: "No tenant linked to this application" }, 404);
   }
 
   const nowIso = new Date().toISOString();
   const { data: passport } = await supabase
     .from("tenant_passports")
-    .select(
-      `
-      id,
-      identity_verified,
-      credit_score,
-      income_verified,
-      eviction_history,
-      criminal_records,
-      right_to_rent,
-      screening_provider,
-      passport_expiry_date
-    `
-    )
+    .select("id, identity_verified, credit_score, income_verified, eviction_history, criminal_records, right_to_rent, screening_provider, passport_expiry_date")
     .eq("tenant_id", tenantId)
     .gt("passport_expiry_date", nowIso)
     .order("passport_expiry_date", { ascending: false })
@@ -114,6 +103,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     passportExpiryDate: p?.passport_expiry_date ?? null
   };
 
-  return res.status(200).json({ passport: summary });
+  return json({ passport: summary });
 }
-

@@ -1,13 +1,15 @@
 export const runtime = "edge";
 
 import { getAdminClient } from "../../../lib/apiAuth";
-import { getSupabaseServer } from "../../../lib/supabaseServer";
+import { getEnv } from "../../../lib/cloudflareEnv";
+import { runScreening } from "../../../lib/runScreening";
 
-// Run on Node so raw body is available (required for Stripe signature verification).
-// On Cloudflare Pages/Edge, use a separate Node webhook endpoint (see docs/WEBHOOK.md).
-export const config = { api: { bodyParser: false } };
-
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
 
 function parseStripeSignature(header: string): { t: string; v1: string } | null {
   const parts: Record<string, string> = {};
@@ -46,16 +48,13 @@ async function verifyStripeWebhook(
   return hex === parsed.v1;
 }
 
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json" }
-  });
-}
-
 export default async function handler(req: Request) {
   if (req.method !== "POST") return new Response(null, { status: 405 });
+
+  const env = getEnv();
+  const webhookSecret = env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) return json({ error: "Webhook not configured" }, 503);
+
   const rawBody = await req.text();
   const sigHeader = req.headers.get("stripe-signature") ?? "";
   if (!sigHeader) return json({ error: "Missing signature" }, 400);
@@ -83,11 +82,12 @@ export default async function handler(req: Request) {
     return json({ error: "Invalid JSON" }, 400);
   }
 
-  // SaaS billing: sync subscription status to landlords
+  const db = getAdminClient();
+
   if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
     const sub = event.data?.object as { customer?: string; status?: string; current_period_end?: number } | undefined;
     if (sub?.customer) {
-      const { data: landlord } = await getSupabaseServer()
+      const { data: landlord } = await db
         .from("landlords")
         .select("id")
         .eq("stripe_customer_id", sub.customer)
@@ -97,7 +97,7 @@ export default async function handler(req: Request) {
         const periodEnd = sub.current_period_end
           ? new Date(sub.current_period_end * 1000).toISOString()
           : null;
-        await getSupabaseServer()
+        await db
           .from("landlords")
           .update({
             subscription_status: status,
@@ -111,12 +111,12 @@ export default async function handler(req: Request) {
   if (event.type === "payment_intent.succeeded") {
     const paymentId = event.data?.object?.metadata?.paymentId;
     if (paymentId) {
-      await getAdminClient()
+      await db
         .from("payments")
         .update({ status: "paid", paid_at: new Date().toISOString() })
         .eq("id", paymentId);
 
-      const { data: payment } = await getSupabaseServer()
+      const { data: payment } = await db
         .from("payments")
         .select("application_id, payment_type, amount_cents, currency")
         .eq("id", paymentId)
@@ -124,7 +124,7 @@ export default async function handler(req: Request) {
 
       if (payment && (payment as { payment_type: string }).payment_type === "screening_fee") {
         const applicationId = (payment as { application_id: string }).application_id;
-        const { data: app } = await getSupabaseServer()
+        const { data: app } = await db
           .from("applications")
           .select("id, tenants ( id, first_name, last_name, dob )")
           .eq("id", applicationId)
@@ -133,16 +133,13 @@ export default async function handler(req: Request) {
           const tenant = (app as { tenants: { id: string; first_name: string; last_name: string; dob: string } | null }).tenants;
           if (tenant?.dob && tenant.id) {
             try {
-              const { runScreening } = await import("../../../lib/runScreening");
               const screenData = await runScreening({
                 firstName: tenant.first_name,
                 lastName: tenant.last_name,
                 dob: tenant.dob
               });
 
-              // Persist legacy fields on applications for backward-compatible UI.
-              const supabaseServer = getSupabaseServer();
-              await supabaseServer
+              await db
                 .from("applications")
                 .update({
                   credit_score: screenData.credit_score ?? null,
@@ -153,14 +150,14 @@ export default async function handler(req: Request) {
                 })
                 .eq("id", applicationId);
 
-              // Create a tenant_screenings row to track this screening event.
-              const screeningInsert = await supabaseServer
+              const providerName = env.RENTPREP_API_KEY ? "rentprep" : env.CHECKR_API_KEY ? "checkr" : "mock";
+              const { data: screeningRow } = await db
                 .from("tenant_screenings")
                 .insert({
                   tenant_id: tenant.id,
                   application_id: applicationId,
                   jurisdiction: null,
-                  provider: process.env.RENTPREP_API_KEY ? "rentprep" : process.env.CHECKR_API_KEY ? "checkr" : "mock",
+                  provider: providerName,
                   status: "completed",
                   started_at: new Date().toISOString(),
                   completed_at: new Date().toISOString(),
@@ -170,12 +167,10 @@ export default async function handler(req: Request) {
                 .select("id")
                 .single();
 
-              const screeningId =
-                (screeningInsert.data as { id: string } | null)?.id ?? null;
+              const screeningId = (screeningRow as { id: string } | null)?.id ?? null;
 
               if (screeningId) {
-                // Save a normalized summary; raw_encrypted left null until real provider wiring is added.
-                await supabaseServer.from("screening_reports").insert({
+                await db.from("screening_reports").insert({
                   tenant_screening_id: screeningId,
                   summary: {
                     credit_score: screenData.credit_score,
@@ -184,10 +179,9 @@ export default async function handler(req: Request) {
                   }
                 });
 
-                // Upsert tenant_passport for this tenant.
                 const now = new Date();
-                const expiry = new Date(now.getTime() + 45 * 24 * 60 * 60 * 1000); // ~45 days
-                const { data: existingPassport } = await supabaseServer
+                const expiry = new Date(now.getTime() + 45 * 24 * 60 * 60 * 1000);
+                const { data: existingPassport } = await db
                   .from("tenant_passports")
                   .select("id, passport_expiry_date")
                   .eq("tenant_id", tenant.id)
@@ -195,7 +189,7 @@ export default async function handler(req: Request) {
                   .maybeSingle();
 
                 if (existingPassport) {
-                  await supabaseServer
+                  await db
                     .from("tenant_passports")
                     .update({
                       identity_verified: true,
@@ -204,14 +198,14 @@ export default async function handler(req: Request) {
                       eviction_history: screenData.evictions,
                       criminal_records: screenData.criminal_record,
                       right_to_rent: null,
-                      screening_provider: process.env.RENTPREP_API_KEY ? "rentprep" : process.env.CHECKR_API_KEY ? "checkr" : "mock",
+                      screening_provider: providerName,
                       last_screening_id: screeningId,
                       passport_expiry_date: expiry.toISOString(),
                       updated_at: now.toISOString()
                     })
                     .eq("id", (existingPassport as { id: string }).id);
                 } else {
-                  await supabaseServer.from("tenant_passports").insert({
+                  await db.from("tenant_passports").insert({
                     tenant_id: tenant.id,
                     identity_verified: true,
                     credit_score: screenData.credit_score,
@@ -219,7 +213,7 @@ export default async function handler(req: Request) {
                     eviction_history: screenData.evictions,
                     criminal_records: screenData.criminal_record,
                     right_to_rent: null,
-                    screening_provider: process.env.RENTPREP_API_KEY ? "rentprep" : process.env.CHECKR_API_KEY ? "checkr" : "mock",
+                    screening_provider: providerName,
                     last_screening_id: screeningId,
                     passport_expiry_date: expiry.toISOString()
                   });
