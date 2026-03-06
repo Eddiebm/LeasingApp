@@ -55,11 +55,19 @@ export default async function handler(req: Request) {
     if (tokenUserId !== ADMIN_USER_ID) return json({ error: "Forbidden" }, 403);
   }
 
-  const url = new URL(req.url);
+  let url: URL;
+  try { url = new URL(req.url); } catch { return json({ error: "Bad request" }, 400); }
   const period = (url.searchParams.get("period") || "month").toLowerCase();
   const { start: periodStart, end: periodEnd } = getPeriodBounds(period);
 
-  const db = getAdminClient();
+  let db: ReturnType<typeof getAdminClient>;
+  try {
+    db = getAdminClient();
+  } catch (e) {
+    return json({ error: "DB init failed", detail: String(e) }, 500);
+  }
+
+  try {
 
   // Screening revenue (payments: screening_fee, paid)
   const { data: screeningRows } = await db
@@ -387,4 +395,8 @@ export default async function handler(req: Request) {
     aiUsage: { period: aiUsagePeriod, ytd: aiUsageYtd },
     redFlags,
   });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return json({ error: "Query failed", detail: msg }, 500);
+  }
 }
