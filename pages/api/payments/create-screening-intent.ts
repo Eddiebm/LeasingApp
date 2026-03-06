@@ -1,74 +1,98 @@
-import type { NextApiRequest, NextApiResponse } from "next";
-import Stripe from "stripe";
-import { getSupabaseServer } from "../../../lib/supabaseServer";
+import { getAdminClient } from "../../../lib/apiAuth";
+import { getEnv } from "../../../lib/cloudflareEnv";
 
 export const runtime = "edge";
 
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 const SCREENING_FEE_CENTS = Math.max(50, Math.round(Number(process.env.SCREENING_FEE_CENTS) || 3500)); // default $35
 
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" })
-  : null;
+export default async function handler(req: Request) {
+  if (req.method !== "POST") return new Response(null, { status: 405 });
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).end();
-  const { applicationId } = req.body ?? {};
+  const env = getEnv();
+  const stripeKey = (env as Record<string, string>).STRIPE_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY;
+
+  let body: Record<string, unknown> = {};
+  try { body = await req.json(); } catch { /* empty body */ }
+
+  const { applicationId } = body ?? {};
   if (!applicationId || typeof applicationId !== "string") {
-    return res.status(400).json({ error: "applicationId required" });
+    return json({ error: "applicationId required" }, 400);
   }
 
-  const { data: app } = await getSupabaseServer()
+  const supabase = getAdminClient();
+
+  const { data: app } = await supabase
     .from("applications")
     .select("id")
     .eq("id", applicationId)
     .single();
-  if (!app) return res.status(404).json({ error: "Application not found" });
+  if (!app) return json({ error: "Application not found" }, 404);
 
-  const { data: existing } = await getSupabaseServer()
+  const { data: existing } = await supabase
     .from("payments")
     .select("id, status")
     .eq("application_id", applicationId)
     .eq("payment_type", "screening_fee")
     .maybeSingle();
+
   if (existing && existing.status === "paid") {
-    return res.status(400).json({ error: "Screening fee already paid for this application" });
+    return json({ error: "Screening fee already paid for this application" }, 400);
   }
 
-  if (!stripe) return res.status(503).json({ error: "Payments not configured" });
+  if (!stripeKey) return json({ error: "Payments not configured" }, 503);
 
-  const { data: paymentRow, error: payError } = await getSupabaseServer()
+  const { data: paymentRow, error: payError } = await supabase
     .from("payments")
     .insert({
       application_id: applicationId,
       amount_cents: SCREENING_FEE_CENTS,
       status: "pending",
-      payment_type: "screening_fee"
+      payment_type: "screening_fee",
     })
     .select("id")
     .single();
 
   if (payError || !paymentRow) {
     console.error(payError);
-    return res.status(500).json({ error: "Failed to create payment record" });
+    return json({ error: "Failed to create payment record" }, 500);
   }
 
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: SCREENING_FEE_CENTS,
-    currency: "usd",
-    metadata: {
-      applicationId,
-      paymentId: (paymentRow as { id: string }).id,
-      payment_type: "screening_fee"
-    }
+  const piRes = await fetch("https://api.stripe.com/v1/payment_intents", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${stripeKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      amount: String(SCREENING_FEE_CENTS),
+      currency: "usd",
+      "metadata[applicationId]": applicationId,
+      "metadata[paymentId]": (paymentRow as { id: string }).id,
+      "metadata[payment_type]": "screening_fee",
+    }).toString(),
   });
 
-  await getSupabaseServer()
+  if (!piRes.ok) {
+    console.error("Stripe PI error:", await piRes.text());
+    return json({ error: "Failed to create payment intent" }, 502);
+  }
+
+  const paymentIntent = (await piRes.json()) as { id: string; client_secret: string };
+
+  await supabase
     .from("payments")
     .update({ stripe_payment_intent_id: paymentIntent.id })
     .eq("id", (paymentRow as { id: string }).id);
 
-  return res.status(200).json({
+  return json({
     clientSecret: paymentIntent.client_secret,
-    amountCents: SCREENING_FEE_CENTS
+    amountCents: SCREENING_FEE_CENTS,
   });
 }

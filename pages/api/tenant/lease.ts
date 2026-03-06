@@ -1,17 +1,24 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { getAdminClient } from "../../../lib/apiAuth";
 
 export const runtime = "edge";
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
 /**
  * GET /api/tenant/lease?applicationId=&email=
  * Returns lease info for sign-lease page after verifying email.
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") return res.status(405).end();
-  const applicationId = (req.query.applicationId as string)?.trim();
-  const email = (req.query.email as string)?.trim()?.toLowerCase();
-  if (!applicationId || !email) return res.status(400).json({ error: "applicationId and email required" });
+export default async function handler(req: Request) {
+  const _url = new URL(req.url);
+  if (req.method !== "GET") return new Response(null, { status: 405 });
+  const applicationId = (_url.searchParams.get("applicationId") as string)?.trim();
+  const email = (_url.searchParams.get("email") as string)?.trim()?.toLowerCase();
+  if (!applicationId || !email) return json({ error: "applicationId and email required" }, 400);
 
   const supabase = getAdminClient();
   const { data: app, error } = await supabase
@@ -28,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .eq("id", applicationId)
     .single();
 
-  if (error || !app) return res.status(404).json({ error: "Application not found" });
+  if (error || !app) return json({ error: "Application not found" }, 404);
   const a = app as {
     id: string;
     status: string;
@@ -39,7 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     properties: { address: string; city: string; state: string; zip: string; rent: number } | null;
   };
   const tenantEmail = a.tenants?.email?.toLowerCase();
-  if (tenantEmail !== email) return res.status(403).json({ error: "Access denied" });
+  if (tenantEmail !== email) return json({ error: "Access denied" }, 403);
 
   const { data: doc } = await supabase
     .from("documents")
@@ -57,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     : "";
   const rent = a.properties?.rent ?? null;
 
-  return res.status(200).json({
+  return json({
     applicationId: a.id,
     tenantName,
     propertyAddress,
@@ -67,5 +74,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     signedAt: a.lease_signed_at,
     signedPdfUrl: a.lease_signed_pdf_url,
     signature: a.signature
-  });
+  }, 200);
 }

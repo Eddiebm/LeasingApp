@@ -1,9 +1,15 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { getLandlordOrAdmin } from "../../../lib/apiAuth";
 import { createSupabaseForUser } from "../../../lib/supabaseUser";
 import { getSupabaseServer } from "../../../lib/supabaseServer";
 
 export const runtime = "edge";
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
 function slugify(s: string): string {
   return s
@@ -17,19 +23,19 @@ function slugify(s: string): string {
  * Body: { companyName?, phone?, slug? }
  * Landlord only. Updates own profile. Slug must be unique (excluding self).
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "PATCH") return res.status(405).end();
+export default async function handler(req: Request) {
+  if (req.method !== "PATCH") return new Response(null, { status: 405 });
 
   const auth = await getLandlordOrAdmin(req);
   if (!auth || auth.role !== "landlord" || !auth.landlord) {
-    return res.status(401).json({ error: "Unauthorized" });
+    return json({ error: "Unauthorized" }, 401);
   }
 
-  const token = req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice(7) : null;
-  if (!token) return res.status(401).json({ error: "Unauthorized" });
+  const token = req.headers.get("authorization")?.startsWith("Bearer ") ? req.headers.get("authorization").slice(7) : null;
+  if (!token) return json({ error: "Unauthorized" }, 401);
   const supabase = createSupabaseForUser(token);
 
-  const { companyName, phone, slug: rawSlug } = req.body ?? {};
+  const { companyName, phone, slug: rawSlug } = body ?? {};
   const updates: { company_name?: string; phone?: string; slug?: string } = {};
 
   if (companyName !== undefined) {
@@ -40,19 +46,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   if (rawSlug !== undefined) {
     const slug = typeof rawSlug === "string" ? slugify(rawSlug) : "";
-    if (!slug) return res.status(400).json({ error: "Slug cannot be empty" });
+    if (!slug) return json({ error: "Slug cannot be empty" }, 400);
     const { data: existing } = await getSupabaseServer()
       .from("landlords")
       .select("id")
       .eq("slug", slug)
       .neq("id", auth.landlord.id)
       .maybeSingle();
-    if (existing) return res.status(409).json({ error: "This URL slug is already taken. Choose another." });
+    if (existing) return json({ error: "This URL slug is already taken. Choose another." }, 409);
     updates.slug = slug;
   }
 
   if (Object.keys(updates).length === 0) {
-    return res.status(400).json({ error: "No fields to update" });
+    return json({ error: "No fields to update" }, 400);
   }
 
   const { data, error } = await supabase
@@ -64,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (error) {
     console.error(error);
-    return res.status(500).json({ error: error.message });
+    return json({ error: error.message }, 500);
   }
-  return res.status(200).json(data);
+  return json(data);
 }

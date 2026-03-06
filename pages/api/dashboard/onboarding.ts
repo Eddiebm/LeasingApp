@@ -1,9 +1,15 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { getLandlordOrAdmin } from "../../../lib/apiAuth";
 import { getSupabaseServer } from "../../../lib/supabaseServer";
 
 export const runtime = "edge";
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
 function slugify(s: string): string {
   return s
@@ -17,25 +23,28 @@ function slugify(s: string): string {
  * Body: { fullName, companyName?, phone?, slug? }
  * Creates landlords row + user_roles (landlord) for the current user. Slug must be unique.
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).end();
+export default async function handler(req: Request) {
+  if (req.method !== "POST") return new Response(null, { status: 405 });
+
+  let body: Record<string, unknown> = {};
+  try { body = await req.json(); } catch { /* empty body */ }
 
   const auth = await getLandlordOrAdmin(req);
   if (!auth || auth.role !== null) {
-    return res.status(400).json({ error: "Already onboarded or unauthorized" });
+    return json({ error: "Already onboarded or unauthorized" }, 400);
   }
 
-  const { fullName, companyName, phone, slug: rawSlug } = req.body ?? {};
+  const { fullName, companyName, phone, slug: rawSlug } = body ?? {};
   const fullNameStr = String(fullName ?? "").trim();
-  if (!fullNameStr) return res.status(400).json({ error: "fullName is required" });
+  if (!fullNameStr) return json({ error: "fullName is required" }, 400);
 
   let slug: string | null = typeof rawSlug === "string" ? slugify(rawSlug) : null;
   if (!slug && companyName) slug = slugify(String(companyName));
   if (!slug) slug = slugify(fullNameStr);
-  if (!slug) return res.status(400).json({ error: "Could not generate a slug; provide slug or companyName" });
+  if (!slug) return json({ error: "Could not generate a slug; provide slug or companyName" }, 400);
 
   const { data: existing } = await getSupabaseServer().from("landlords").select("id").eq("slug", slug).maybeSingle();
-  if (existing) return res.status(409).json({ error: "This URL slug is already taken. Choose another." });
+  if (existing) return json({ error: "This URL slug is already taken. Choose another." }, 409);
 
   const { data: landlord, error: landlordError } = await getSupabaseServer()
     .from("landlords")
@@ -52,7 +61,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (landlordError || !landlord) {
     console.error(landlordError);
-    return res.status(500).json({ error: landlordError?.message ?? "Failed to create landlord profile" });
+    return json({ error: landlordError?.message ?? "Failed to create landlord profile" }, 500);
   }
 
   const { error: roleError } = await getSupabaseServer().from("user_roles").upsert(
@@ -63,10 +72,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (roleError) {
     console.error(roleError);
     await getSupabaseServer().from("landlords").delete().eq("id", landlord.id);
-    return res.status(500).json({ error: "Failed to assign role" });
+    return json({ error: "Failed to assign role" }, 500);
   }
 
-  return res.status(200).json({
+  return json({
     success: true,
     landlord: { id: landlord.id, slug: landlord.slug, companyName: landlord.company_name },
   });

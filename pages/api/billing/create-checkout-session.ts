@@ -1,52 +1,89 @@
+import { getLandlordOrAdmin } from "../../../lib/apiAuth";
+import { getAdminClient } from "../../../lib/apiAuth";
+import { getEnv } from "../../../lib/cloudflareEnv";
+
 export const runtime = "edge";
 
-import type { NextApiRequest, NextApiResponse } from "next";
-import Stripe from "stripe";
-import { getLandlordOrAdmin } from "../../../lib/apiAuth";
-import { getSupabaseServer } from "../../../lib/supabaseServer";
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" })
-  : null;
-const priceId = process.env.STRIPE_SUBSCRIPTION_PRICE_ID;
-
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).end();
+export default async function handler(req: Request) {
+  if (req.method !== "POST") return new Response(null, { status: 405 });
 
   const auth = await getLandlordOrAdmin(req);
   if (!auth || auth.role !== "landlord" || !auth.landlord) {
-    return res.status(401).json({ error: "Unauthorized" });
+    return json({ error: "Unauthorized" }, 401);
   }
-  if (!stripe || !priceId) {
-    return res.status(503).json({ error: "Billing not configured" });
+
+  const env = getEnv();
+  const stripeKey = env.STRIPE_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY;
+  const priceId = env.STRIPE_SUBSCRIPTION_PRICE_ID ?? process.env.STRIPE_SUBSCRIPTION_PRICE_ID;
+
+  if (!stripeKey || !priceId) {
+    return json({ error: "Billing not configured" }, 503);
   }
 
   const landlordId = auth.landlord.id;
   const email = auth.landlord.email;
   let customerId = auth.landlord.stripe_customer_id ?? null;
 
+  const adminClient = getAdminClient();
+
   if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: email ?? undefined,
-      metadata: { landlord_id: landlordId }
+    const custRes = await fetch("https://api.stripe.com/v1/customers", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${stripeKey}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        email: email ?? "",
+        "metadata[landlord_id]": landlordId,
+      }).toString(),
     });
+    if (!custRes.ok) {
+      console.error("Stripe create customer:", await custRes.text());
+      return json({ error: "Failed to create billing account." }, 502);
+    }
+    const customer = (await custRes.json()) as { id: string };
     customerId = customer.id;
-    await getSupabaseServer()
+    await adminClient
       .from("landlords")
       .update({ stripe_customer_id: customerId })
       .eq("id", landlordId);
   }
 
-  const origin = req.headers.origin || req.headers.referer?.replace(/\/$/, "") || "http://localhost:3000";
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    customer: customerId,
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${origin}/dashboard/billing?success=1`,
-    cancel_url: `${origin}/dashboard/billing?canceled=1`,
-    metadata: { landlord_id: landlordId },
-    subscription_data: { metadata: { landlord_id: landlordId } }
+  const origin =
+    (req.headers.get("origin") || req.headers.get("referer") || "").replace(/\/$/, "") ||
+    "https://leasingapp.pages.dev";
+
+  const sessionRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${stripeKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      mode: "subscription",
+      customer: customerId,
+      "line_items[0][price]": priceId,
+      "line_items[0][quantity]": "1",
+      success_url: `${origin}/dashboard/billing?success=1`,
+      cancel_url: `${origin}/dashboard/billing?canceled=1`,
+      "metadata[landlord_id]": landlordId,
+      "subscription_data[metadata][landlord_id]": landlordId,
+    }).toString(),
   });
 
-  return res.status(200).json({ url: session.url });
+  if (!sessionRes.ok) {
+    console.error("Stripe create session:", await sessionRes.text());
+    return json({ error: "Failed to create checkout session." }, 502);
+  }
+
+  const session = (await sessionRes.json()) as { url: string };
+  return json({ url: session.url });
 }

@@ -1,7 +1,13 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { getLandlordOrAdmin, getAdminClient } from "../../../lib/apiAuth";
 
 export const runtime = "edge";
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -68,26 +74,26 @@ function validateRow(row: PropertyInput, index: number): { ok: true; data: Valid
   };
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+export default async function handler(req: Request) {
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   const auth = await getLandlordOrAdmin(req);
-  if (!auth) return res.status(401).json({ error: "Unauthorized" });
+  if (!auth) return json({ error: "Unauthorized" }, 401);
 
   let landlordId: string | null = null;
   if (auth.role === "landlord") {
     landlordId = auth.landlordId;
-  } else if (auth.role === "admin" && (req.body as Record<string, unknown>)?.landlordId) {
-    landlordId = String((req.body as Record<string, unknown>).landlordId);
+  } else if (auth.role === "admin" && (body as Record<string, unknown>)?.landlordId) {
+    landlordId = String((body as Record<string, unknown>).landlordId);
   }
   if (!landlordId) {
-    return res.status(400).json({ error: "A landlord is required for these properties." });
+    return json({ error: "A landlord is required for these properties." }, 400);
   }
 
-  const body = req.body ?? {};
+
   const raw = (body as { properties?: unknown }).properties;
   if (!Array.isArray(raw)) {
-    return res.status(400).json({ error: "Request body must include a 'properties' array." });
+    return json({ error: "Request body must include a 'properties' array." }, 400);
   }
 
   const toInsert: ValidRow[] = [];
@@ -114,10 +120,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data, error } = await supabase.from("properties").insert(rows).select("id");
     if (error) {
       console.error(error);
-      return res.status(500).json({ inserted: 0, errors: [...errors, error.message] });
+      return json({ inserted: 0, errors: [...errors, error.message] }, 500);
     }
     inserted = data?.length ?? 0;
   }
 
-  return res.status(200).json({ inserted, errors });
+  return json({ inserted, errors }, 200);
 }

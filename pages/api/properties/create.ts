@@ -1,16 +1,25 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { getSupabaseServer } from "../../../lib/supabaseServer";
 import { getLandlordOrAdmin } from "../../../lib/apiAuth";
 
 export const runtime = "edge";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).end();
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+export default async function handler(req: Request) {
+  if (req.method !== "POST") return new Response(null, { status: 405 });
+
+  let body: Record<string, unknown> = {};
+  try { body = await req.json(); } catch { /* empty body */ }
 
   const auth = await getLandlordOrAdmin(req);
-  if (!auth) return res.status(401).json({ error: "Unauthorized" });
+  if (!auth) return json({ error: "Unauthorized" }, 401);
 
-  const body = req.body ?? {};
+
   const address = String(body.address ?? "").trim();
   const city = String(body.city ?? "").trim();
   const state = String(body.state ?? "").trim();
@@ -18,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const rentValue = body.rent;
 
   if (!address || !city || !state || !zip) {
-    return res.status(400).json({ error: "Address, city, state, and zip are required." });
+    return json({ error: "Address, city, state, and zip are required." }, 400);
   }
 
   const rent =
@@ -29,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       : null;
 
   if (rent == null || Number.isNaN(rent)) {
-    return res.status(400).json({ error: "Rent must be a valid number." });
+    return json({ error: "Rent must be a valid number." }, 400);
   }
 
   let landlordId: string | null = null;
@@ -40,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (!landlordId) {
-    return res.status(400).json({ error: "A landlord is required for this property." });
+    return json({ error: "A landlord is required for this property." }, 400);
   }
 
   const { data, error } = await getSupabaseServer()
@@ -59,9 +68,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (error) {
     console.error(error);
-    return res.status(500).json({ error: error.message });
+    return json({ error: error.message }, 500);
   }
 
-  return res.status(201).json(data);
+  return json(data, 201);
 }
 

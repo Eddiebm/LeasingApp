@@ -1,6 +1,5 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { getRequestContext } from "@cloudflare/next-on-pages";
-import { getSupabaseServer } from "../../lib/supabaseServer";
+import { getAdminClient } from "../../lib/apiAuth";
 
 export const runtime = "edge";
 
@@ -23,6 +22,13 @@ Start the document with this disclaimer (include it verbatim): "IMPORTANT: This 
 
 Output only the lease text, no preamble or commentary.`;
 
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 function extractClauses(text: string): string[] {
   const parts = text.split(/\n(?=\d+\.\s)/).filter(Boolean);
   const clauses = parts.map((p) => p.trim()).filter(Boolean);
@@ -32,16 +38,28 @@ function extractClauses(text: string): string[] {
   return [text];
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+export default async function handler(req: Request) {
+  if (req.method !== "POST") return new Response(null, { status: 405 });
 
-  const env = getRequestContext().env as Record<string, string>;
+  let env: Record<string, string> = {};
+  try {
+    env = getRequestContext().env as Record<string, string>;
+  } catch {
+    env = process.env as Record<string, string>;
+  }
+
   const openaiKey = env.OPENAI_API_KEY;
-  if (!openaiKey) return res.status(503).json({ error: "Lease generation is not configured." });
+  if (!openaiKey) return json({ error: "Lease generation is not configured. Please contact support." }, 503);
 
-  const body = (req.body ?? {}) as Record<string, unknown>;
+  let body: Record<string, unknown> = {};
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "Invalid request body." }, 400);
+  }
+
   const userPrompt = buildUserPrompt(body);
-  if (!userPrompt) return res.status(400).json({ error: "Missing required form data." });
+  if (!userPrompt) return json({ error: "Missing required form data. Please fill in all required fields." }, 400);
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -60,22 +78,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         temperature: 0.3,
       }),
     });
+
     if (!response.ok) {
       const err = await response.text();
       console.error("OpenAI error:", response.status, err);
-      return res.status(502).json({ error: "AI service error. Please try again." });
+      return json({ error: "AI service error. Please try again." }, 502);
     }
+
     const data = (await response.json()) as { choices?: { message?: { content?: string } }[] };
     const rawLease = data.choices?.[0]?.message?.content?.trim();
-    if (!rawLease) return res.status(502).json({ error: "Empty response from AI." });
+    if (!rawLease) return json({ error: "Empty response from AI. Please try again." }, 502);
 
     const fullLeaseText = DISCLAIMER + rawLease;
     const clauses = extractClauses(rawLease);
     const clauseCount = clauses.length;
     const previewClauses = clauses.slice(0, 3).join("\n\n");
 
-    const supabase = getSupabaseServer();
-    const { data: row, error: insertError } = await supabase
+    const adminClient = getAdminClient();
+    const { data: row, error: insertError } = await adminClient
       .from("lease_download_tokens")
       .insert({
         lease_text: fullLeaseText,
@@ -86,17 +106,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (insertError || !row?.token) {
       console.error("Insert lease_download_tokens:", insertError);
-      return res.status(500).json({ error: "Failed to save lease." });
+      return json({ error: "Failed to save lease. Please try again." }, 500);
     }
 
-    return res.status(200).json({
+    return json({
       previewClauses: DISCLAIMER + previewClauses,
       clauseCount,
       token: row.token,
     });
   } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: "Failed to generate lease." });
+    console.error("generate-lease error:", e);
+    return json({ error: "Failed to generate lease. Please try again." }, 500);
   }
 }
 
@@ -118,18 +138,26 @@ function buildUserPrompt(body: Record<string, unknown>): string | null {
   const landlordAddress = String(body.landlordAddress ?? "").trim();
   const landlordEmail = String(body.landlordEmail ?? "").trim();
   const landlordPhone = String(body.landlordPhone ?? "").trim();
-  const tenantNames = Array.isArray(body.tenantNames) ? (body.tenantNames as string[]) : [String(body.tenantNames ?? "")].filter(Boolean);
-  const tenantEmails = Array.isArray(body.tenantEmails) ? (body.tenantEmails as string[]) : [String(body.tenantEmail ?? "")].filter(Boolean);
+  const tenantNames = Array.isArray(body.tenantNames)
+    ? (body.tenantNames as string[])
+    : [String(body.tenantNames ?? "")].filter(Boolean);
+  const tenantEmails = Array.isArray(body.tenantEmails)
+    ? (body.tenantEmails as string[])
+    : [String(body.tenantEmail ?? "")].filter(Boolean);
   const specialClauses = String(body.specialClauses ?? "").trim();
   const currency = country === "UK" ? "£" : "$";
 
   if (!country || !address || !landlordName || tenantNames.length === 0) return null;
 
-  const jurisdiction = country === "UK"
-    ? `United Kingdom${region ? ` - ${region}` : ""}`
-    : `United States - ${state || "N/A"}`;
-  const tenants = tenantNames.map((t, i) => `Tenant ${i + 1}: ${t}${tenantEmails[i] ? ` (${tenantEmails[i]})` : ""}`).join(", ");
-  const duration = leaseDuration === "Custom" && customMonths ? `${customMonths} months` : leaseDuration;
+  const jurisdiction =
+    country === "UK"
+      ? `United Kingdom${region ? ` - ${region}` : ""}`
+      : `United States - ${state || "N/A"}`;
+  const tenants = tenantNames
+    .map((t, i) => `Tenant ${i + 1}: ${t}${tenantEmails[i] ? ` (${tenantEmails[i]})` : ""}`)
+    .join(", ");
+  const duration =
+    leaseDuration === "Custom" && customMonths ? `${customMonths} months` : leaseDuration;
 
   const parts = [
     `Jurisdiction: ${jurisdiction}`,

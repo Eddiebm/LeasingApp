@@ -29,9 +29,14 @@ export type AuthResult =
  * - null: not authenticated or tenant-only (no dashboard access).
  */
 export async function getLandlordOrAdmin(req: {
-  headers: { authorization?: string };
+  headers: { authorization?: string } | { get?: (k: string) => string | null };
 }): Promise<AuthResult> {
-  const authHeader = req.headers.authorization;
+  // Support both NextApiRequest headers (plain object) and Web API Request.headers (Headers)
+  const headers = req.headers as { authorization?: string; get?: (k: string) => string | null };
+  const authHeader =
+    typeof headers.get === "function"
+      ? headers.get("authorization") ?? undefined
+      : headers.authorization;
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const env = getEnv();
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://seedtvpyhmzskkdlnblg.supabase.co";
@@ -65,7 +70,7 @@ export async function getLandlordOrAdmin(req: {
  * If DASHBOARD_STAFF_EMAILS is set, still allows those emails as legacy "staff" (no landlord row required).
  */
 export async function getDashboardUser(req: {
-  headers: { authorization?: string };
+  headers: { authorization?: string } | { get?: (k: string) => string | null };
 }): Promise<{ user: User; email: string } | null> {
   const auth = await getLandlordOrAdmin(req);
   if (auth && (auth.role === "admin" || auth.role === "landlord")) return { user: auth.user, email: auth.email };

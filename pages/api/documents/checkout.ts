@@ -1,22 +1,39 @@
-import type { NextApiRequest, NextApiResponse } from "next";
-import Stripe from "stripe";
 import { getRequestContext } from "@cloudflare/next-on-pages";
-import { getSupabaseServer } from "../../../lib/supabaseServer";
+import { getAdminClient } from "../../../lib/apiAuth";
 
 export const runtime = "edge";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
-  const env = getRequestContext().env as Record<string, string>;
+export default async function handler(req: Request) {
+  if (req.method !== "POST") return new Response(null, { status: 405 });
+
+  let env: Record<string, string> = {};
+  try {
+    env = getRequestContext().env as Record<string, string>;
+  } catch {
+    env = process.env as Record<string, string>;
+  }
+
   const stripeKey = env.STRIPE_SECRET_KEY;
-  if (!stripeKey) return res.status(503).json({ error: "Payments not configured." });
+  if (!stripeKey) return json({ error: "Payments not configured." }, 503);
 
-  const body = (req.body ?? {}) as Record<string, unknown>;
+  let body: Record<string, unknown> = {};
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "Invalid request body." }, 400);
+  }
+
   const documentText = String(body.documentText ?? "").trim();
   const documentType = String(body.documentType ?? "").trim();
   if (!documentText || !documentType) {
-    return res.status(400).json({ error: "Missing documentText or documentType." });
+    return json({ error: "Missing documentText or documentType." }, 400);
   }
 
   const isLease =
@@ -25,8 +42,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     documentType === "lease";
   const amountPence = isLease ? 1500 : 1000; // £15 lease / £10 eviction
 
-  const supabase = getSupabaseServer();
-  const { data: row, error: insertError } = await supabase
+  const adminClient = getAdminClient();
+  const { data: row, error: insertError } = await adminClient
     .from("document_download_tokens")
     .insert({ document_text: documentText, document_type: documentType })
     .select("token")
@@ -34,41 +51,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (insertError || !row?.token) {
     console.error("document_download_tokens insert:", insertError);
-    return res.status(500).json({ error: "Could not create download." });
+    return json({ error: "Could not create download." }, 500);
   }
 
-  const origin = (req.headers.origin || req.headers.referer || "").replace(/\/$/, "") || "http://localhost:3000";
-  const token = row.token;
+  const origin =
+    (req.headers.get("origin") || req.headers.get("referer") || "").replace(/\/$/, "") ||
+    "https://leasingapp.pages.dev";
+  const token = row.token as string;
   const successUrl = `${origin}/documents?paid=1&token=${encodeURIComponent(token)}`;
   const cancelUrl = `${origin}/documents?token=${encodeURIComponent(token)}`;
 
-  const stripe = new Stripe(stripeKey, { apiVersion: "2024-06-20" });
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    payment_method_types: ["card"],
-    line_items: [
-      {
-        price_data: {
-          currency: "gbp",
-          unit_amount: amountPence,
-          product_data: {
-            name: isLease ? "Lease download" : "Eviction notice download",
-            description: "One-time PDF download of your generated document.",
-          },
-        },
-        quantity: 1,
-      },
-    ],
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    client_reference_id: token,
-    metadata: { document_token: token },
+  const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${stripeKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      mode: "payment",
+      "payment_method_types[]": "card",
+      "line_items[0][price_data][currency]": "gbp",
+      "line_items[0][price_data][unit_amount]": String(amountPence),
+      "line_items[0][price_data][product_data][name]": isLease
+        ? "Lease download"
+        : "Eviction notice download",
+      "line_items[0][price_data][product_data][description]":
+        "One-time PDF download of your generated document.",
+      "line_items[0][quantity]": "1",
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      client_reference_id: token,
+      "metadata[document_token]": token,
+    }).toString(),
   });
 
-  await supabase
+  if (!stripeRes.ok) {
+    const err = await stripeRes.text();
+    console.error("Stripe error:", stripeRes.status, err);
+    return json({ error: "Payment setup failed. Please try again." }, 502);
+  }
+
+  const session = (await stripeRes.json()) as { id: string; url: string };
+
+  await adminClient
     .from("document_download_tokens")
     .update({ stripe_session_id: session.id })
     .eq("token", token);
 
-  return res.status(200).json({ url: session.url });
+  return json({ url: session.url });
 }

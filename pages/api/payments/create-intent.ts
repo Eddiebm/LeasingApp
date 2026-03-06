@@ -1,23 +1,24 @@
 import { getAdminClient } from "../../../lib/apiAuth";
 import { getEnv } from "../../../lib/cloudflareEnv";
-import Stripe from "stripe";
 
 export const runtime = "edge";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json" }
+    headers: { "Content-Type": "application/json" },
   });
 }
 
 export default async function handler(req: Request) {
   if (req.method !== "POST") return new Response(null, { status: 405 });
+
   const env = getEnv();
-  const stripeKey = (env as Record<string, string>).STRIPE_SECRET_KEY;
-  const stripe = stripeKey ? new Stripe(stripeKey, { apiVersion: "2024-06-20" }) : null;
+  const stripeKey = (env as Record<string, string>).STRIPE_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY;
+
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* empty body */ }
+
   const { applicationId, amountCents } = body;
   if (!applicationId || typeof amountCents !== "number" || (amountCents as number) < 50) {
     return json({ error: "applicationId and amountCents (min 50) required" }, 400);
@@ -30,15 +31,14 @@ export default async function handler(req: Request) {
     .eq("id", applicationId)
     .single();
   if (!app) return json({ error: "Application not found" }, 404);
-
-  if (!stripe) return json({ error: "Payments not configured" }, 503);
+  if (!stripeKey) return json({ error: "Payments not configured" }, 503);
 
   const { data: paymentRow, error: payError } = await supabase
     .from("payments")
     .insert({
       application_id: applicationId,
       amount_cents: amountCents,
-      status: "pending"
+      status: "pending",
     })
     .select("id")
     .single();
@@ -48,11 +48,26 @@ export default async function handler(req: Request) {
     return json({ error: "Failed to create payment record" }, 500);
   }
 
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: amountCents as number,
-    currency: "usd",
-    metadata: { applicationId: applicationId as string, paymentId: (paymentRow as { id: string }).id }
+  const piRes = await fetch("https://api.stripe.com/v1/payment_intents", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${stripeKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      amount: String(amountCents),
+      currency: "usd",
+      "metadata[applicationId]": String(applicationId),
+      "metadata[paymentId]": (paymentRow as { id: string }).id,
+    }).toString(),
   });
+
+  if (!piRes.ok) {
+    console.error("Stripe PI error:", await piRes.text());
+    return json({ error: "Failed to create payment intent" }, 502);
+  }
+
+  const paymentIntent = (await piRes.json()) as { id: string; client_secret: string };
 
   await supabase
     .from("payments")

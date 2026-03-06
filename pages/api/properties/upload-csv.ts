@@ -1,8 +1,14 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { getSupabaseServer } from "../../../lib/supabaseServer";
 import { getLandlordOrAdmin } from "../../../lib/apiAuth";
 
 export const runtime = "edge";
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
 type PropertyRow = { address: string; city: string; state: string; zip: string; rent: number };
 
@@ -35,26 +41,26 @@ function validateRow(row: unknown, index: number): { ok: true; data: PropertyRow
   return { ok: true, data: { address, city, state, zip, rent } };
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+export default async function handler(req: Request) {
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   const auth = await getLandlordOrAdmin(req);
-  if (!auth) return res.status(401).json({ error: "Unauthorized" });
+  if (!auth) return json({ error: "Unauthorized" }, 401);
 
   let landlordId: string | null = null;
   if (auth.role === "landlord") {
     landlordId = auth.landlordId;
-  } else if (auth.role === "admin" && (req.body as Record<string, unknown>)?.landlordId) {
-    landlordId = String((req.body as Record<string, unknown>).landlordId);
+  } else if (auth.role === "admin" && (body as Record<string, unknown>)?.landlordId) {
+    landlordId = String((body as Record<string, unknown>).landlordId);
   }
   if (!landlordId) {
-    return res.status(400).json({ error: "A landlord is required for these properties." });
+    return json({ error: "A landlord is required for these properties." }, 400);
   }
 
-  const body = req.body ?? {};
+
   const raw = (body as { properties?: unknown }).properties;
   if (!Array.isArray(raw)) {
-    return res.status(400).json({ error: "Request body must include a 'properties' array." });
+    return json({ error: "Request body must include a 'properties' array." }, 400);
   }
 
   const validated: PropertyRow[] = [];
@@ -66,14 +72,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (errors.length > 0) {
-    return res.status(400).json({
+    return json({
       error: "Some rows are invalid.",
       invalidRows: errors,
-    });
+    }, 400);
   }
 
   if (validated.length === 0) {
-    return res.status(400).json({ error: "No valid properties to upload." });
+    return json({ error: "No valid properties to upload." }, 400);
   }
 
   const rows = validated.map((p) => ({
@@ -90,8 +96,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (error) {
     console.error(error);
-    return res.status(500).json({ error: error.message });
+    return json({ error: error.message }, 500);
   }
 
-  return res.status(201).json({ created: data?.length ?? 0, properties: data ?? [] });
+  return json({ created: data?.length ?? 0, properties: data ?? [] }, 201);
 }
