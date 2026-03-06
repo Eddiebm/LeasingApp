@@ -1,7 +1,7 @@
-\"use client\";
+"use client";
 
-import Link from \"next/link\";
-import { useSubscription } from \"./SubscriptionContext\";
+import Link from "next/link";
+import { useSubscription } from "./SubscriptionContext";
 
 function getSavingsCopy(feature: string, country: "UK" | "US"): { title: string; body: string; payoff: string } {
   const name = feature;
