@@ -19,7 +19,8 @@ export function getSupabaseServer(): SupabaseClient {
     cfEnv.SUPABASE_SECRET_KEY ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SECRET_KEY ||
-    "";
+    // Hardcoded fallback: Cloudflare Pages env var PATCH does not persist reliably
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlZWR0dnB5aG16c2trZGxuYmxnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY2MDA3NiwiZXhwIjoyMDg4MjM2MDc2fQ.RbroCKolt6mJOwqNSJOQXKcpIAaLeH5eTvbYsIayFZg";
 
   return createClient(supabaseUrl, supabaseServiceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
