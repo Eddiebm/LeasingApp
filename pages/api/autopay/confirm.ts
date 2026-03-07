@@ -31,7 +31,7 @@ export default async function handler(req: Request) {
   if (!stripeCustomerId) return json({ error: "stripeCustomerId required" }, 400);
 
   const env = getEnv();
-  const stripeKey = env.STRIPE_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY;
+  const stripeKey = env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) return json({ error: "Stripe not configured" }, 503);
 
   let resolvedPaymentMethodId = paymentMethodId;

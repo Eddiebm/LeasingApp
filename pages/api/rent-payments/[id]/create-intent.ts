@@ -56,7 +56,7 @@ export default async function handler(req: Request) {
   if (!connectAccountId) return json({ error: "Landlord Connect not configured" }, 503);
 
   const env = getEnv();
-  const stripeKey = env.STRIPE_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY;
+  const stripeKey = env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) return json({ error: "Stripe not configured" }, 503);
 
   const paymentMethodTypes = paymentMethod === "ach" ? ["us_bank_account"] : ["card"];

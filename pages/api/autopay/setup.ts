@@ -37,7 +37,7 @@ export default async function handler(req: Request) {
   if (tenantEmailFromSchedule !== tenantEmail) return json({ error: "Email does not match schedule tenant" }, 403);
 
   const env = getEnv();
-  const stripeKey = env.STRIPE_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY;
+  const stripeKey = env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) return json({ error: "Stripe not configured" }, 503);
 
   const { data: existingCustomer } = await admin

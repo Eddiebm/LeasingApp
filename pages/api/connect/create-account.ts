@@ -22,7 +22,7 @@ export default async function handler(req: Request) {
   }
 
   const env = getEnv();
-  const stripeKey = env.STRIPE_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY;
+  const stripeKey = env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) return json({ error: "Stripe not configured" }, 503);
 
   const country = (landlord.country === "UK" || landlord.country === "GB") ? "GB" : "US";

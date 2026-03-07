@@ -83,22 +83,24 @@ export default function BillingPage() {
     if (!session?.access_token) return;
     setConnectLoading(true);
     try {
-      if (!landlord?.stripe_connect_account_id) {
+      let freshAccountId = landlord?.stripe_connect_account_id ?? null;
+      if (!freshAccountId) {
         const createRes = await fetch("/api/connect/create-account", {
           method: "POST",
           headers: { Authorization: `Bearer ${session.access_token}` }
         });
         const createData = await createRes.json().catch(() => ({}));
-        if (!createRes.ok && createData.error?.includes("already exists")) {
-          // refresh landlord and get link
-        } else if (!createRes.ok) {
+        // accountId is returned on both success (200) and already-exists (400)
+        if (createData.accountId) freshAccountId = createData.accountId;
+        if (!createRes.ok && !freshAccountId) {
           alert(createData.error || "Could not create account.");
           return;
         }
       }
       const linkRes = await fetch("/api/connect/onboarding-link", {
         method: "POST",
-        headers: { Authorization: `Bearer ${session.access_token}` }
+        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId: freshAccountId })
       });
       const linkData = await linkRes.json().catch(() => ({}));
       if (linkData.url) window.location.href = linkData.url;
