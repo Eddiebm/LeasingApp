@@ -212,6 +212,28 @@ export default async function handler(req: Request) {
   // Failed rent payments (all time for "problems")
   const { data: failedRentPayments } = await db.from("rent_payments").select("id, created_at, amount_cents, landlord_id").eq("status", "failed").order("created_at", { ascending: false }).limit(20);
 
+  // Fraud reports
+  let fraudReports: { id: string; propertyId: string; reporterEmail: string | null; reporterName: string | null; reason: string; details: string | null; status: string; createdAt: string }[] = [];
+  let fraudReportsPending = 0;
+  try {
+    const { data: fraudRows } = await db
+      .from("fraud_reports")
+      .select("id, property_id, reporter_email, reporter_name, reason, details, status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    fraudReports = (fraudRows ?? []).map((r) => ({
+      id: (r as { id: string }).id,
+      propertyId: (r as { property_id: string }).property_id,
+      reporterEmail: (r as { reporter_email: string | null }).reporter_email,
+      reporterName: (r as { reporter_name: string | null }).reporter_name,
+      reason: (r as { reason: string }).reason,
+      details: (r as { details: string | null }).details,
+      status: (r as { status: string }).status,
+      createdAt: (r as { created_at: string }).created_at,
+    }));
+    fraudReportsPending = fraudReports.filter((r) => r.status === "pending").length;
+  } catch { /* fraud_reports table may not exist */ }
+
   // Totals for year estimate
   const yearBounds = getPeriodBounds("year");
   const { data: screeningYear } = await db
@@ -394,6 +416,8 @@ export default async function handler(req: Request) {
     })),
     aiUsage: { period: aiUsagePeriod, ytd: aiUsageYtd },
     redFlags,
+    fraudReports,
+    fraudReportsPending,
   });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

@@ -71,6 +71,17 @@ type CommandCenterData = {
     screeningPaymentsStuck: number;
     listedPropertiesNoConnect: number;
   };
+  fraudReports?: {
+    id: string;
+    propertyId: string;
+    reporterEmail: string | null;
+    reporterName: string | null;
+    reason: string;
+    details: string | null;
+    status: string;
+    createdAt: string;
+  }[];
+  fraudReportsPending?: number;
 };
 
 const PERIODS = ["day", "week", "month", "year"] as const;
@@ -410,6 +421,81 @@ export default function CommandCenterPage() {
               </ul>
             </section>
           )}
+
+          {/* Fraud Reports */}
+          <section className="rounded-2xl border border-orange-200 bg-orange-50/50 p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-orange-900">Fraud Reports</h2>
+                <p className="mt-1 text-xs text-orange-800">Listings reported by renters as potentially fraudulent.</p>
+              </div>
+              {(data.fraudReportsPending ?? 0) > 0 && (
+                <span className="rounded-full bg-orange-600 px-3 py-1 text-xs font-bold text-white">
+                  {data.fraudReportsPending} pending
+                </span>
+              )}
+            </div>
+            {(data.fraudReports ?? []).length === 0 ? (
+              <p className="mt-4 text-sm text-orange-800">No fraud reports yet.</p>
+            ) : (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-orange-200 text-left text-orange-800">
+                      <th className="pb-2 pr-4">Date</th>
+                      <th className="pb-2 pr-4">Property ID</th>
+                      <th className="pb-2 pr-4">Reporter</th>
+                      <th className="pb-2 pr-4">Reason</th>
+                      <th className="pb-2 pr-4">Details</th>
+                      <th className="pb-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.fraudReports ?? []).map((r) => (
+                      <tr key={r.id} className="border-b border-orange-100">
+                        <td className="py-2 pr-4 text-slate-600">{formatDate(r.createdAt)}</td>
+                        <td className="py-2 pr-4">
+                          <a
+                            href={`/rentals/${r.propertyId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-xs text-blue-700 underline"
+                          >
+                            {r.propertyId.slice(0, 8)}…
+                          </a>
+                        </td>
+                        <td className="py-2 pr-4">
+                          <span className="font-medium">{r.reporterName || "—"}</span>
+                          {r.reporterEmail && (
+                            <span className="ml-1 text-xs text-slate-500">({r.reporterEmail})</span>
+                          )}
+                        </td>
+                        <td className="py-2 pr-4 font-medium text-orange-900">{r.reason}</td>
+                        <td className="max-w-xs py-2 pr-4 text-xs text-slate-600">
+                          {r.details ? (
+                            <span title={r.details}>{r.details.length > 80 ? r.details.slice(0, 80) + "…" : r.details}</span>
+                          ) : "—"}
+                        </td>
+                        <td className="py-2">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                              r.status === "pending"
+                                ? "bg-orange-100 text-orange-800"
+                                : r.status === "resolved"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
+                            {r.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
 
           {/* Maintenance */}
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
