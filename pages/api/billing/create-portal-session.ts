@@ -19,7 +19,7 @@ export default async function handler(req: Request) {
   }
 
   const env = getEnv();
-  const stripeKey = env.STRIPE_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY;
+  const stripeKey = env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) return json({ error: "Billing not configured" }, 503);
 
   const customerId = auth.landlord.stripe_customer_id;

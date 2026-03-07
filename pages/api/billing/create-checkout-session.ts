@@ -20,12 +20,12 @@ export default async function handler(req: Request) {
   }
 
   const env = getEnv();
-  const stripeKey = env.STRIPE_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY;
+  const stripeKey = env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
   const landlordCountry = auth.landlord.country === "US" ? "US" : "UK";
   const priceId =
     landlordCountry === "US"
-      ? (env.STRIPE_SUBSCRIPTION_PRICE_ID_USD ?? process.env.STRIPE_SUBSCRIPTION_PRICE_ID_USD)
-      : (env.STRIPE_SUBSCRIPTION_PRICE_ID ?? process.env.STRIPE_SUBSCRIPTION_PRICE_ID);
+      ? (env.STRIPE_SUBSCRIPTION_PRICE_ID_USD || process.env.STRIPE_SUBSCRIPTION_PRICE_ID_USD)
+      : (env.STRIPE_SUBSCRIPTION_PRICE_ID || process.env.STRIPE_SUBSCRIPTION_PRICE_ID);
 
   if (!stripeKey || !priceId) {
     return json({ error: "Billing not configured" }, 503);

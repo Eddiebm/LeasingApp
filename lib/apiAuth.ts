@@ -69,6 +69,7 @@ export async function getLandlordOrAdmin(req: {
       email: "eddie@bannermanmenson.com",
       phone: null,
       slug: "eddie-bannerman-menson",
+      country: "US",
       stripe_customer_id: null,
       subscription_status: "active",
       subscription_current_period_end: null,
