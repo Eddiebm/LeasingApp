@@ -9,9 +9,13 @@ export function getSupabaseServer(): SupabaseClient {
   let cfEnv: Record<string, string> = {};
   try { cfEnv = getRequestContext().env as Record<string, string>; } catch { /* not in CF runtime */ }
 
+  // Use || not ?? so empty string env vars (Cloudflare Pages behavior) fall back correctly
   const supabaseUrl =
+    cfEnv.NEXT_PUBLIC_SUPABASE_URL ||
+    cfEnv.SUPABASE_URL ||
     process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.SUPABASE_URL ||
+    // Hardcoded fallback: Cloudflare Pages process.env is empty at edge runtime
     "https://seedtvpyhmzskkdlnblg.supabase.co";
 
   const supabaseServiceKey =
