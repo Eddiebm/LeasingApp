@@ -156,6 +156,34 @@ export default function Dashboard() {
   const [csvUploading, setCsvUploading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // Property import modal state
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importQuery, setImportQuery] = useState("");
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<{
+    region?: string;
+    formattedAddress?: string;
+    address?: string | null;
+    city?: string;
+    state?: string;
+    zip?: string;
+    county?: string;
+    postcode?: string;
+    bedrooms?: number | null;
+    bathrooms?: number | null;
+    squareFootage?: number | null;
+    yearBuilt?: number | null;
+    propertyType?: string | null;
+    rentEstimate?: number | null;
+    rentRangeLow?: number | null;
+    rentRangeHigh?: number | null;
+    requiresManualAddress?: boolean;
+    serviceUnavailable?: boolean;
+  } | null>(null);
+  const [importForm, setImportForm] = useState({ address: "", city: "", state: "", zip: "", rent: "" });
+  const [importSaving, setImportSaving] = useState(false);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
@@ -268,6 +296,78 @@ export default function Dashboard() {
       setCopyFeedback(true);
       setTimeout(() => setCopyFeedback(false), 2000);
     });
+  };
+
+  const handleImportLookup = async () => {
+    const q = importQuery.trim();
+    if (!q) return;
+    setImportLoading(true);
+    setImportError(null);
+    setImportResult(null);
+    try {
+      const res = await fetch(`/api/properties/import-lookup?q=${encodeURIComponent(q)}`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setImportError(data.error ?? "Could not look up property.");
+        if (data.serviceUnavailable) {
+          // Pre-fill the form with what the user typed so they can continue manually
+          setImportForm({ address: q, city: "", state: "", zip: "", rent: "" });
+        }
+        return;
+      }
+      setImportResult(data);
+      setImportForm({
+        address: data.address ?? q,
+        city: data.city ?? "",
+        state: data.state ?? "",
+        zip: data.zip ?? data.postcode ?? "",
+        rent: data.rentEstimate ? String(Math.round(data.rentEstimate)) : "",
+      });
+    } catch {
+      setImportError("Failed to look up property. Please try again.");
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleImportSave = async () => {
+    if (!importForm.address || !importForm.city || !importForm.state || !importForm.zip || !importForm.rent) {
+      setImportError("Please fill in all required fields.");
+      return;
+    }
+    setImportSaving(true);
+    setImportError(null);
+    try {
+      const res = await fetch("/api/properties/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({
+          address: importForm.address,
+          city: importForm.city,
+          state: importForm.state,
+          zip: importForm.zip,
+          rent: importForm.rent,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setImportError(data.error ?? "Could not save property.");
+        return;
+      }
+      // Success — close modal and refresh
+      setImportModalOpen(false);
+      setImportQuery("");
+      setImportResult(null);
+      setImportForm({ address: "", city: "", state: "", zip: "", rent: "" });
+      setImportError(null);
+      await fetchProperties();
+    } catch {
+      setImportError("There was a problem saving the property.");
+    } finally {
+      setImportSaving(false);
+    }
   };
 
   const handleCreateProperty = async (e: React.FormEvent) => {
@@ -454,7 +554,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -466,6 +566,19 @@ export default function Dashboard() {
                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 Upload Properties (CSV)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setImportModalOpen(true);
+                  setImportQuery("");
+                  setImportResult(null);
+                  setImportError(null);
+                  setImportForm({ address: "", city: "", state: "", zip: "", rent: "" });
+                }}
+                className="rounded-lg border border-teal-300 bg-teal-50 px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-100"
+              >
+                &#x2B07; Import from Listing
               </button>
             </div>
             <form onSubmit={handleCreateProperty} className="mt-2 grid gap-2 md:grid-cols-5">
@@ -621,6 +734,141 @@ export default function Dashboard() {
           </div>
         )}
       </section>
+
+      {importModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+            <div className="border-b border-slate-200 p-4">
+              <h2 id="import-modal-title" className="text-lg font-semibold text-slate-800">Import property from listing</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                <strong>US:</strong> Enter a full address (e.g. 123 Main St, Austin, TX 78701).<br />
+                <strong>UK:</strong> Enter a postcode (e.g. SW1A 1AA) to auto-fill location details.
+              </p>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Step 1: Search */}
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Address or UK postcode…"
+                  value={importQuery}
+                  onChange={(e) => setImportQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleImportLookup(); } }}
+                />
+                <button
+                  type="button"
+                  onClick={handleImportLookup}
+                  disabled={importLoading || !importQuery.trim()}
+                  className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {importLoading ? "Looking up…" : "Look up"}
+                </button>
+              </div>
+
+              {importError && (
+                <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800">
+                  {importError}
+                </div>
+              )}
+
+              {/* Step 2: Preview card (US) */}
+              {importResult && importResult.region === "us" && (
+                <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 space-y-1">
+                  <p className="text-sm font-semibold text-teal-900">{importResult.formattedAddress}</p>
+                  <div className="flex flex-wrap gap-3 text-xs text-teal-800">
+                    {importResult.bedrooms != null && <span>{importResult.bedrooms} bed{importResult.bedrooms !== 1 ? "s" : ""}</span>}
+                    {importResult.bathrooms != null && <span>{importResult.bathrooms} bath{importResult.bathrooms !== 1 ? "s" : ""}</span>}
+                    {importResult.squareFootage != null && <span>{importResult.squareFootage.toLocaleString()} sqft</span>}
+                    {importResult.yearBuilt != null && <span>Built {importResult.yearBuilt}</span>}
+                    {importResult.propertyType && <span>{importResult.propertyType}</span>}
+                  </div>
+                  {importResult.rentEstimate != null && (
+                    <p className="text-xs text-teal-700">
+                      Estimated rent: <strong>${importResult.rentEstimate.toLocaleString()}/mo</strong>
+                      {importResult.rentRangeLow != null && importResult.rentRangeHigh != null && (
+                        <span className="text-teal-600"> (range: ${importResult.rentRangeLow.toLocaleString()}–${importResult.rentRangeHigh.toLocaleString()})</span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Step 2: Preview card (UK) */}
+              {importResult && importResult.region === "uk" && (
+                <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 space-y-1">
+                  <p className="text-sm font-semibold text-teal-900">Postcode: {importResult.postcode}</p>
+                  <p className="text-xs text-teal-800">{importResult.city}{importResult.county ? `, ${importResult.county}` : ""}, {importResult.state}</p>
+                  <p className="text-xs text-teal-600">Enter the street address and rent below to complete the import.</p>
+                </div>
+              )}
+
+              {/* Step 3: Editable form fields */}
+              {(importResult || importError) && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-slate-600">Review and confirm details:</p>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <input
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      placeholder="Street address *"
+                      value={importForm.address}
+                      onChange={(e) => setImportForm({ ...importForm, address: e.target.value })}
+                    />
+                    <input
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      placeholder="City *"
+                      value={importForm.city}
+                      onChange={(e) => setImportForm({ ...importForm, city: e.target.value })}
+                    />
+                    <input
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      placeholder="State / Region *"
+                      value={importForm.state}
+                      onChange={(e) => setImportForm({ ...importForm, state: e.target.value })}
+                    />
+                    <input
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      placeholder="ZIP / Postcode *"
+                      value={importForm.zip}
+                      onChange={(e) => setImportForm({ ...importForm, zip: e.target.value })}
+                    />
+                  </div>
+                  <input
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    placeholder="Monthly rent ($) *"
+                    value={importForm.rent}
+                    onChange={(e) => setImportForm({ ...importForm, rent: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-slate-200 p-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setImportModalOpen(false);
+                  setImportQuery("");
+                  setImportResult(null);
+                  setImportError(null);
+                  setImportForm({ address: "", city: "", state: "", zip: "", rent: "" });
+                }}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              {(importResult || importError) && (
+                <button
+                  type="button"
+                  onClick={handleImportSave}
+                  disabled={importSaving || !importForm.address || !importForm.city || !importForm.state || !importForm.zip || !importForm.rent}
+                  className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+                >
+                  {importSaving ? "Saving…" : "Import property"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {csvModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="csv-modal-title">
