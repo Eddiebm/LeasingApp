@@ -18,6 +18,17 @@ The Stripe webhook at `POST /api/webhooks/stripe` **must run in a Node.js enviro
 - `customer.subscription.updated` / `customer.subscription.deleted` (SaaS billing)  
   - Looks up landlord by `stripe_customer_id` and updates `landlords.subscription_status` and `subscription_current_period_end`.
 
+## Connect webhook (bank account onboarding)
+
+A **separate** Stripe webhook is used for Connect: `POST /api/webhooks/stripe-connect`. It listens for `account.updated` and updates `landlords.stripe_connect_onboarded` (and charges/payouts flags). If this webhook is not configured, landlords can complete bank onboarding on Stripe's page but the app will never update and will keep showing "Connect bank account".
+
+- In Stripe Dashboard: **Developers → Webhooks → Add endpoint** (or a second endpoint).
+- **URL:** `https://your-domain.com/api/webhooks/stripe-connect`
+- **Events:** `account.updated`
+- Set the signing secret as `STRIPE_CONNECT_WEBHOOK_SECRET` in your host's environment.
+
+Same as the main webhook: this route must run in an environment where raw body and signature verification work (Node preferred; see Deployments above).
+
 ## Local testing
 
 Use Stripe CLI: `stripe listen --forward-to localhost:3000/api/webhooks/stripe` and set `STRIPE_WEBHOOK_SECRET` to the CLI’s signing secret.

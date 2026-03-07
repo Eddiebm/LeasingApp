@@ -24,7 +24,7 @@ export default async function handler(req: Request) {
   if (req.method === "GET") {
     const { data, error } = await db
       .from("properties")
-      .select("id, landlord_id, is_listed, listing_headline, listing_description, listing_photo_url, bedrooms, bathrooms, available_from, listing_slug, rent, address, city, state, zip")
+      .select("id, landlord_id, is_listed, listing_headline, listing_description, listing_photo_url, bedrooms, bathrooms, available_from, listing_slug, rent, address, city, state, zip, photos")
       .eq("id", id)
       .maybeSingle();
 
@@ -59,6 +59,7 @@ export default async function handler(req: Request) {
     if (body.bedrooms != null) payload.bedrooms = Number(body.bedrooms) || null;
     if (body.bathrooms != null) payload.bathrooms = Number(body.bathrooms) || null;
     if (typeof body.available_from === "string") payload.available_from = body.available_from || null;
+    if (Array.isArray(body.photos)) payload.photos = body.photos.filter((u): u is string => typeof u === "string");
 
     const { error: updateError } = await db.from("properties").update(payload).eq("id", id);
     if (updateError) {

@@ -18,6 +18,7 @@ Use `.env.local` for local dev. For Cloudflare Pages, set variables in the dashb
 | `STRIPE_SECRET_KEY` | Local + CF (server only) | Stripe secret key for Payment Intents (rent, etc.). Read via `getRequestContext().env` on Cloudflare. |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Local + GitHub/CF | Stripe publishable key for `/pay` page. |
 | `STRIPE_WEBHOOK_SECRET` | Webhook host only | Stripe webhook signing secret. Use on the host that serves `POST /api/webhooks/stripe` (see README). |
+| `STRIPE_CONNECT_WEBHOOK_SECRET` | Webhook host only | Stripe **Connect** webhook signing secret. Required for bank-account onboarding: Stripe sends `account.updated` to `POST /api/webhooks/stripe-connect` so the app can set `stripe_connect_onboarded`. Without this, landlords can add a bank on Stripe but the app will still show "Connect bank account". |
 | `RESEND_API_KEY` | Local + CF | Resend API key for transactional email (application confirmation, landlord notification, approve/reject, maintenance ticket). Read via `(getRequestContext().env as Record<string, string>).RESEND_API_KEY` on Cloudflare. |
 | `LANDLORD_EMAIL` | Local + CF | Email address to notify when a tenant submits an application. Read via `getRequestContext().env` on Cloudflare. |
 | `EMAIL_FROM` | Local + CF | Sender for Resend (e.g. `Bannerman Leasing <noreply@yourdomain.com>`). Defaults to Resend onboarding address. |

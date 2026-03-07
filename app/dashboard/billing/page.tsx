@@ -94,8 +94,14 @@ export default function BillingPage() {
         const createData = await createRes.json().catch(() => ({}));
         // accountId is returned on both success (200) and already-exists (400)
         if (createData.accountId) freshAccountId = createData.accountId;
+        if (!createRes.ok && createData.error?.includes("already exists")) {
+          const meRes = await fetch("/api/dashboard/me", { headers: { Authorization: `Bearer ${session.access_token}` } });
+          const meData = await meRes.json().catch(() => ({}));
+          if (meData.landlord) setLandlord(meData.landlord);
+        }
         if (!createRes.ok && !freshAccountId) {
           alert(createData.error || "Could not create account.");
+          setConnectLoading(false);
           return;
         }
       }

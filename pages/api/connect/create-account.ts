@@ -26,6 +26,17 @@ export default async function handler(req: Request) {
   if (!stripeKey) return json({ error: "Stripe not configured" }, 503);
 
   const country = (landlord.country === "UK" || landlord.country === "GB") ? "GB" : "US";
+  const params: Record<string, string> = {
+    type: "express",
+    country,
+    email: landlord.email ?? "",
+    "capabilities[card_payments][requested]": "true",
+    "capabilities[transfers][requested]": "true"
+  };
+  // ACH is US-only; requesting it for GB causes Stripe to reject account creation
+  if (country === "US") {
+    params["capabilities[us_bank_account_ach_payments][requested]"] = "true";
+  }
 
   const res = await fetch("https://api.stripe.com/v1/accounts", {
     method: "POST",
@@ -33,14 +44,7 @@ export default async function handler(req: Request) {
       Authorization: `Bearer ${stripeKey}`,
       "Content-Type": "application/x-www-form-urlencoded"
     },
-    body: new URLSearchParams({
-      type: "express",
-      country,
-      email: landlord.email ?? "",
-      "capabilities[card_payments][requested]": "true",
-      "capabilities[transfers][requested]": "true",
-      "capabilities[us_bank_account_ach_payments][requested]": "true"
-    }).toString()
+    body: new URLSearchParams(params).toString()
   });
 
   if (!res.ok) {

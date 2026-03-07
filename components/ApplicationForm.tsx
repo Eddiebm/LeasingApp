@@ -61,8 +61,10 @@ export default function ApplicationForm({ landlordSlug, initialPropertyId }: App
   }, [landlordSlug]);
 
   useEffect(() => {
-    if (initialPropertyId) setForm((f) => ({ ...f, propertyId: initialPropertyId }));
-  }, [initialPropertyId]);
+    if (!initialPropertyId || properties.length === 0) return;
+    const belongs = properties.some((p) => p.id === initialPropertyId);
+    if (belongs) setForm((f) => ({ ...f, propertyId: initialPropertyId }));
+  }, [initialPropertyId, properties]);
 
   const handleFraudReport = async () => {
     if (!fraudReason) return;

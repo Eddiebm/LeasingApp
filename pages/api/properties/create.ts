@@ -4,6 +4,17 @@ import { isProSubscriber, FREE_PROPERTY_LIMIT } from "../../../lib/subscription"
 
 export const runtime = "edge";
 
+/*
+  Migration: add to properties table if not present:
+  - photos TEXT[] DEFAULT '{}'
+  - description TEXT
+  - available_from DATE
+  - pets_allowed TEXT
+  - furnished BOOLEAN DEFAULT false
+  - parking BOOLEAN DEFAULT false
+  - amenities TEXT[] DEFAULT '{}'
+*/
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -73,6 +84,14 @@ export default async function handler(req: Request) {
     }
   }
 
+  const photos = Array.isArray(body.photos) ? body.photos.filter((u): u is string => typeof u === "string") : [];
+  const description = typeof body.description === "string" ? body.description.trim().slice(0, 1000) : null;
+  const availableFrom = typeof body.available_from === "string" && body.available_from.trim() ? body.available_from.trim() : null;
+  const petsAllowed = typeof body.pets_allowed === "string" && ["yes", "no", "negotiable"].includes(body.pets_allowed) ? body.pets_allowed : null;
+  const furnished = body.furnished === true || body.furnished === "true";
+  const parking = body.parking === true || body.parking === "true";
+  const amenities = Array.isArray(body.amenities) ? body.amenities.filter((a): a is string => typeof a === "string") : [];
+
   const { data, error } = await db
     .from("properties")
     .insert({
@@ -83,6 +102,13 @@ export default async function handler(req: Request) {
       zip,
       rent,
       status: "active",
+      photos: photos.length ? photos : undefined,
+      description: description || undefined,
+      available_from: availableFrom || undefined,
+      pets_allowed: petsAllowed || undefined,
+      furnished: furnished || undefined,
+      parking: parking || undefined,
+      amenities: amenities.length ? amenities : undefined,
     })
     .select("id, address, city, state, zip, rent")
     .single();
