@@ -14,7 +14,7 @@ export default async function handler(req: Request) {
   if (req.method !== "POST") return new Response(null, { status: 405 });
 
   const auth = await getLandlordOrAdmin(req);
-  if (!auth || auth.role !== "landlord" || !auth.landlord) return json({ error: "Unauthorized" }, 401);
+  if (!auth || (auth.role !== "landlord" && auth.role !== "admin") || !auth.landlord) return json({ error: "Unauthorized" }, 401);
 
   const landlord = auth.landlord;
   if (landlord.stripe_connect_account_id) {

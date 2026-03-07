@@ -21,7 +21,7 @@ export type LandlordRow = {
 };
 
 export type AuthResult =
-  | { user: User; email: string; role: "admin" }
+  | { user: User; email: string; role: "admin"; landlordId?: string; landlord?: LandlordRow }
   | { user: User; email: string; role: "landlord"; landlordId: string; landlord: LandlordRow }
   | { user: User; email: string; role: null }
   | null;
@@ -46,8 +46,9 @@ export async function getLandlordOrAdmin(req: {
       : headers.authorization;
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const env = getEnv();
-  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://seedtvpyhmzskkdlnblg.supabase.co";
-  const supabaseAnon = env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ?? "sb_publishable_KUY0YWTlIfqPW20phruqiw_B75TXglU";
+  // Use || not ?? so empty string env vars (Cloudflare Pages behavior) fall back to hardcoded values
+  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "https://seedtvpyhmzskkdlnblg.supabase.co";
+  const supabaseAnon = env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY || "sb_publishable_KUY0YWTlIfqPW20phruqiw_B75TXglU";
   if (!token || !supabaseUrl || !supabaseAnon) return null;
 
   const authClient = createClient(supabaseUrl, supabaseAnon);
@@ -58,7 +59,19 @@ export async function getLandlordOrAdmin(req: {
   if (error || !user?.email) return null;
 
   // Hardcoded bootstrap admin bypass for Cloudflare runtime when service role key is unavailable.
+  // Also fetch the landlord record so admin can use billing/connect APIs that require role:landlord.
   if (user.id === ADMIN_USER_ID) {
+    try {
+      const { data: adminLandlord } = await getSupabaseServer()
+        .from("landlords")
+        .select("id, user_id, full_name, company_name, email, phone, slug, stripe_customer_id, subscription_status, subscription_current_period_end, stripe_connect_account_id, stripe_connect_onboarded, stripe_connect_charges_enabled, stripe_connect_payouts_enabled")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (adminLandlord) {
+        // Return as admin but also include landlord data so billing/connect APIs work
+        return { user, email: user.email, role: "admin", landlordId: adminLandlord.id, landlord: adminLandlord as LandlordRow };
+      }
+    } catch { /* fall through to plain admin */ }
     return { user, email: user.email, role: "admin" };
   }
 
