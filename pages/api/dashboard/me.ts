@@ -40,7 +40,7 @@ export default async function handler(req: Request) {
   if (!auth) {
     const tokenUserId = getUserIdFromBearerToken(req);
     if (tokenUserId === ADMIN_USER_ID) {
-      return json({ role: "admin", email: ADMIN_EMAIL }, 200);
+      return json({ role: "admin", email: ADMIN_EMAIL, country: "US" }, 200);
     }
     return json({ error: "Unauthorized" }, 401);
   }
@@ -50,7 +50,15 @@ export default async function handler(req: Request) {
   }
 
   if (auth.role === "admin") {
-    return json({ role: "admin", email: auth.email }, 200);
+    // Return landlord data for admin so billing/connect pages work correctly
+    const landlord = auth.landlord ?? null;
+    return json({
+      role: "admin",
+      email: auth.email,
+      landlord,
+      subscription_status: landlord?.subscription_status ?? "active",
+      country: (landlord?.country as "US" | "UK") ?? "US",
+    }, 200);
   }
 
   const landlord = auth.landlord!;
