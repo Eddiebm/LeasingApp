@@ -44,9 +44,11 @@ export default async function handler(req: Request) {
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    console.error("Stripe create account:", err);
-    return json({ error: "Failed to create Connect account" }, 502);
+    const errText = await res.text();
+    console.error("Stripe create account:", errText);
+    let stripeMsg = "Failed to create Connect account";
+    try { const errJson = JSON.parse(errText); stripeMsg = errJson?.error?.message || stripeMsg; } catch {}
+    return json({ error: stripeMsg, stripeKey: stripeKey ? stripeKey.substring(0, 12) + '...' : 'MISSING' }, 502);
   }
 
   const account = (await res.json()) as { id: string };
