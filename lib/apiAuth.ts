@@ -58,21 +58,26 @@ export async function getLandlordOrAdmin(req: {
   } = await authClient.auth.getUser(token);
   if (error || !user?.email) return null;
 
-  // Hardcoded bootstrap admin bypass for Cloudflare runtime when service role key is unavailable.
-  // Also fetch the landlord record so admin can use billing/connect APIs that require role:landlord.
+  // Hardcoded bootstrap admin bypass for Cloudflare runtime.
+  // Landlord record is hardcoded so no DB call is needed — avoids getSupabaseServer() failures.
   if (user.id === ADMIN_USER_ID) {
-    try {
-      const { data: adminLandlord } = await getSupabaseServer()
-        .from("landlords")
-        .select("id, user_id, full_name, company_name, email, phone, slug, stripe_customer_id, subscription_status, subscription_current_period_end, stripe_connect_account_id, stripe_connect_onboarded, stripe_connect_charges_enabled, stripe_connect_payouts_enabled")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (adminLandlord) {
-        // Return as admin but also include landlord data so billing/connect APIs work
-        return { user, email: user.email, role: "admin", landlordId: adminLandlord.id, landlord: adminLandlord as LandlordRow };
-      }
-    } catch { /* fall through to plain admin */ }
-    return { user, email: user.email, role: "admin" };
+    const adminLandlord: LandlordRow = {
+      id: "3c146d80-af20-4204-9c47-73292770cc08",
+      user_id: ADMIN_USER_ID,
+      full_name: "Eddie Bannerman Menson",
+      company_name: null,
+      email: "eddie@bannermanmenson.com",
+      phone: null,
+      slug: "eddie-bannerman-menson",
+      stripe_customer_id: null,
+      subscription_status: "active",
+      subscription_current_period_end: null,
+      stripe_connect_account_id: null,
+      stripe_connect_onboarded: null,
+      stripe_connect_charges_enabled: null,
+      stripe_connect_payouts_enabled: null,
+    };
+    return { user, email: user.email, role: "admin", landlordId: adminLandlord.id, landlord: adminLandlord };
   }
 
   const [{ data: roleRow }, { data: landlordRows }] = await Promise.all([
