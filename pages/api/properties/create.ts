@@ -92,6 +92,19 @@ export default async function handler(req: Request) {
     return json({ error: error.message }, 500);
   }
 
+  // Phase 2: Trigger async ownership check (fire-and-forget, non-blocking)
+  if (data?.id) {
+    const origin = new URL(req.url).origin;
+    fetch(`${origin}/api/properties/ownership-check`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: req.headers.get("Authorization") || "",
+      },
+      body: JSON.stringify({ propertyId: data.id }),
+    }).catch(() => { /* non-blocking */ });
+  }
+
   return json(data, 201);
 }
 

@@ -18,6 +18,8 @@ export type LandlordRow = {
   stripe_connect_onboarded?: boolean | null;
   stripe_connect_charges_enabled?: boolean | null;
   stripe_connect_payouts_enabled?: boolean | null;
+  identity_verified?: boolean | null;
+  phone_verified?: boolean | null;
 };
 
 export type AuthResult =
@@ -77,13 +79,15 @@ export async function getLandlordOrAdmin(req: {
       stripe_connect_onboarded: null,
       stripe_connect_charges_enabled: null,
       stripe_connect_payouts_enabled: null,
+      identity_verified: false,
+      phone_verified: false,
     };
     return { user, email: user.email, role: "admin", landlordId: adminLandlord.id, landlord: adminLandlord };
   }
 
   const [{ data: roleRow }, { data: landlordRows }] = await Promise.all([
     getSupabaseServer().from("user_roles").select("role").eq("user_id", user.id).maybeSingle(),
-    getSupabaseServer().from("landlords").select("id, user_id, full_name, company_name, email, phone, slug, stripe_customer_id, subscription_status, subscription_current_period_end, country, stripe_connect_account_id, stripe_connect_onboarded, stripe_connect_charges_enabled, stripe_connect_payouts_enabled").eq("user_id", user.id).maybeSingle(),
+    getSupabaseServer().from("landlords").select("id, user_id, full_name, company_name, email, phone, slug, stripe_customer_id, subscription_status, subscription_current_period_end, country, stripe_connect_account_id, stripe_connect_onboarded, stripe_connect_charges_enabled, stripe_connect_payouts_enabled, identity_verified, phone_verified").eq("user_id", user.id).maybeSingle(),
   ]);
 
   const role = roleRow?.role;

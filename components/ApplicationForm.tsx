@@ -24,6 +24,14 @@ export default function ApplicationForm({ landlordSlug, initialPropertyId }: App
   const [submitting, setSubmitting] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
 
+  // Fraud report state
+  const [showFraudModal, setShowFraudModal] = useState(false);
+  const [fraudReason, setFraudReason] = useState("");
+  const [fraudDetails, setFraudDetails] = useState("");
+  const [fraudEmail, setFraudEmail] = useState("");
+  const [fraudSubmitting, setFraudSubmitting] = useState(false);
+  const [fraudSubmitted, setFraudSubmitted] = useState(false);
+
   const [form, setForm] = useState({
     propertyId: initialPropertyId ?? "",
     firstName: "",
@@ -55,6 +63,25 @@ export default function ApplicationForm({ landlordSlug, initialPropertyId }: App
   useEffect(() => {
     if (initialPropertyId) setForm((f) => ({ ...f, propertyId: initialPropertyId }));
   }, [initialPropertyId]);
+
+  const handleFraudReport = async () => {
+    if (!fraudReason) return;
+    setFraudSubmitting(true);
+    try {
+      await fetch("/api/fraud-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          propertyId: form.propertyId || null,
+          reporterEmail: fraudEmail,
+          reason: fraudReason,
+          details: fraudDetails,
+        }),
+      });
+      setFraudSubmitted(true);
+    } catch { /* silent */ }
+    finally { setFraudSubmitting(false); }
+  };
 
   const next = () => setStep((s) => (s < 4 ? ((s + 1) as Step) : s));
   const back = () => setStep((s) => (s > 1 ? ((s - 1) as Step) : s));
@@ -304,6 +331,87 @@ export default function ApplicationForm({ landlordSlug, initialPropertyId }: App
           </button>
         )}
       </div>
+      {/* Fraud report link */}
+      <div className="mt-4 text-center">
+        <button
+          type="button"
+          onClick={() => setShowFraudModal(true)}
+          className="text-xs text-slate-400 underline hover:text-red-500"
+        >
+          Report this listing as suspicious
+        </button>
+      </div>
+
+      {/* Fraud report modal */}
+      {showFraudModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl space-y-4">
+            {fraudSubmitted ? (
+              <div className="text-center space-y-3">
+                <p className="text-2xl">&#10003;</p>
+                <p className="font-medium text-slate-800">Report submitted</p>
+                <p className="text-sm text-slate-600">Thank you for helping keep the platform safe. We&apos;ll review this listing.</p>
+                <button type="button" onClick={() => setShowFraudModal(false)}
+                  className="w-full rounded-xl bg-black px-4 py-2 text-sm font-medium text-white">
+                  Close
+                </button>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <h3 className="font-semibold text-slate-900">Report suspicious listing</h3>
+                  <p className="text-xs text-slate-500 mt-1">Help us protect renters. All reports are reviewed by our team.</p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Reason *</label>
+                  <select
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    value={fraudReason}
+                    onChange={(e) => setFraudReason(e.target.value)}
+                  >
+                    <option value="">Select a reason&hellip;</option>
+                    <option value="not_owner">Landlord does not own this property</option>
+                    <option value="fake_listing">This listing does not exist</option>
+                    <option value="scam">Asking for money upfront / scam</option>
+                    <option value="wrong_info">Incorrect property information</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Details (optional)</label>
+                  <textarea
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    rows={3}
+                    placeholder="Tell us more about what you noticed&hellip;"
+                    value={fraudDetails}
+                    onChange={(e) => setFraudDetails(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Your email (optional)</label>
+                  <input type="email"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    placeholder="So we can follow up if needed"
+                    value={fraudEmail}
+                    onChange={(e) => setFraudEmail(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setShowFraudModal(false)}
+                    className="flex-1 rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700">
+                    Cancel
+                  </button>
+                  <button type="button" onClick={handleFraudReport}
+                    disabled={!fraudReason || fraudSubmitting}
+                    className="flex-1 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+                    {fraudSubmitting ? "Submitting&hellip;" : "Submit report"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

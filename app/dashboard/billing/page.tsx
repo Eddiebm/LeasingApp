@@ -16,6 +16,7 @@ type LandlordBilling = {
   stripe_connect_onboarded?: boolean | null;
   stripe_connect_charges_enabled?: boolean | null;
   stripe_connect_payouts_enabled?: boolean | null;
+  identity_verified?: boolean | null;
 };
 
 export default function BillingPage() {
@@ -30,6 +31,7 @@ export default function BillingPage() {
   const [connectLoading, setConnectLoading] = useState(false);
   const [connectStatus, setConnectStatus] = useState<{ chargesEnabled: boolean; payoutsEnabled: boolean; onboarded: boolean } | null>(null);
   const [leasesPerYear, setLeasesPerYear] = useState<1 | 2 | 3 | 5>(1);
+  const [identityLoading, setIdentityLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => setSession(s ?? null));
@@ -198,6 +200,53 @@ export default function BillingPage() {
           Onboarding expired or was refreshed. You can start again below.
         </div>
       )}
+      {/* Phase 3: Identity Verification */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">Identity verification</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Verify your identity to build trust with tenants and unlock rent collection.
+        </p>
+        {landlord?.identity_verified ? (
+          <div className="mt-4 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800">
+              ✓ Identity verified
+            </span>
+            <span className="text-xs text-slate-500">Your identity has been confirmed.</span>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-3">
+            <ul className="text-sm text-slate-700 space-y-1">
+              <li>✓ Protects tenants from fraudulent listings</li>
+              <li>✓ Adds a verified badge to your profile</li>
+              <li>✓ Required before collecting rent payments</li>
+            </ul>
+            <button
+              type="button"
+              disabled={identityLoading || !session?.access_token}
+              onClick={async () => {
+                if (!session?.access_token) return;
+                setIdentityLoading(true);
+                try {
+                  const res = await fetch("/api/billing/create-identity-session", {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${session.access_token}` },
+                  });
+                  const data = await res.json().catch(() => ({}));
+                  if (data.url) window.location.href = data.url;
+                  else alert(data.error || "Could not start identity verification.");
+                } catch {
+                  alert("Something went wrong. Please try again.");
+                } finally {
+                  setIdentityLoading(false);
+                }
+              }}
+              className="rounded-xl bg-teal-600 px-4 py-3 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+            >
+              {identityLoading ? "Redirecting…" : "Verify my identity →"}
+            </button>
+          </div>
+        )}
+      </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Rent collection</h2>
