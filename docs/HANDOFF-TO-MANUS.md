@@ -1,6 +1,6 @@
 # Handoff to Manus — What’s Been Done
 
-Summary of changes and features added to the Leasing App (Next.js on Cloudflare Pages, edge runtime, Supabase). Use this to bring Manus up to speed.
+Summary of changes and features added to the RentLease (Next.js on Cloudflare Pages, edge runtime, Supabase). Use this to bring Manus up to speed.
 
 ---
 

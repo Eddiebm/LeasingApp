@@ -29,7 +29,7 @@ export default async function handler(req: Request) {
 
   const origin =
     (req.headers.get("origin") || req.headers.get("referer") || "").replace(/\/$/, "") ||
-    "https://leasingapp.pages.dev";
+    "https://rentlease.app";
 
   const portalRes = await fetch("https://api.stripe.com/v1/billing_portal/sessions", {
     method: "POST",

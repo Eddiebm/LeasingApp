@@ -102,10 +102,10 @@ export default async function handler(req: Request) {
             <div>
               Apply at{" "}
               <span style={{ color: "#22c55e" }}>
-                leasingapp.pages.dev/listing/{listingPath}
+                rentlease.app/listing/{listingPath}
               </span>
             </div>
-            <div style={{ fontSize: 22, fontWeight: 600 }}>Bannerman Leasing</div>
+            <div style={{ fontSize: 22, fontWeight: 600 }}>RentLease</div>
           </div>
         </div>
       </div>

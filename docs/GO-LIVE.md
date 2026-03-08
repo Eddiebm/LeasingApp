@@ -76,7 +76,7 @@ Set these in **Vercel** (Project → Settings → Environment Variables) or **Cl
 | Variable | Example / note |
 |----------|-----------------|
 | `RESEND_API_KEY` | From Resend dashboard |
-| `EMAIL_FROM` | `Bannerman Leasing <noreply@yourdomain.com>` |
+| `EMAIL_FROM` | `RentLease <noreply@yourdomain.com>` |
 | `LANDLORD_EMAIL` | (Optional) Where to email new application alerts |
 
 **Optional**
@@ -108,7 +108,7 @@ See **ENV.md** for full list.
 ## 6. Smoke test
 
 - [ ] Visit `/dashboard` and sign in as the admin user.
-- [ ] Go to **Settings** and set company name and **slug** (e.g. `bannerman`). Save.
+- [ ] Go to **Settings** and set company name and **slug** (e.g. `rentlease`). Save.
 - [ ] Open **`/apply/<your-slug>`** in an incognito window; confirm the application form loads.
 - [ ] Submit a test application; check that you get a confirmation (and optional email).
 - [ ] In the dashboard, open the application and approve it; check that the tenant gets the sign-lease email (if Resend is set).

@@ -3,7 +3,7 @@
 ## How to run
 
 **Option A – Chrome DevTools (easiest)**  
-1. Open [https://leasingapp.pages.dev](https://leasingapp.pages.dev) in Chrome.  
+1. Open [https://rentlease.app](https://rentlease.app) in Chrome.  
 2. DevTools → **Lighthouse** tab.  
 3. Select **Performance**, **Accessibility**, **Best practices**, **SEO**.  
 4. Choose **Mobile** or **Desktop**, then **Analyze page load**.
@@ -12,13 +12,13 @@
 With Chrome installed:
 
 ```bash
-npx lighthouse https://leasingapp.pages.dev --view --output=html --output-path=./lighthouse-report.html
+npx lighthouse https://rentlease.app --view --output=html --output-path=./lighthouse-report.html
 ```
 
 Open `lighthouse-report.html` in a browser to see the report.
 
 **Option C – PageSpeed Insights**  
-[https://pagespeed.web.dev/](https://pagespeed.web.dev/) → enter `https://leasingapp.pages.dev` for mobile/desktop scores and suggestions.
+[https://pagespeed.web.dev/](https://pagespeed.web.dev/) → enter `https://rentlease.app` for mobile/desktop scores and suggestions.
 
 ---
 

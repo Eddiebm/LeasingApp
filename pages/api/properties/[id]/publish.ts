@@ -82,7 +82,7 @@ export default async function handler(req: Request) {
     return json({ error: "Failed to publish listing." }, 500);
   }
 
-  const listingUrl = `https://leasingapp.pages.dev/listing/${slug}`;
+  const listingUrl = `https://rentlease.app/listing/${slug}`;
   return json({ listingUrl, slug }, 200);
 }
 

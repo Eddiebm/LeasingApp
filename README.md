@@ -1,8 +1,8 @@
-# Leasing App
+# RentLease
 
-Rental agency platform for **Bannerman Group**: tenants submit applications, upload documents (ID, pay stubs, etc.), and complete due diligence; the leasing team reviews applications, runs screening, and generates leases and other documents.
+Rental agency platform for **RentLease**: tenants submit applications, upload documents (ID, pay stubs, etc.), and complete due diligence; the leasing team reviews applications, runs screening, and generates leases and other documents.
 
-**Link to the site:** [https://leasingapp.pages.dev](https://leasingapp.pages.dev) (or your [custom domain](DEPLOY.md) if configured).
+**Link to the site:** [https://rentlease.app](https://rentlease.app) (or your [custom domain](DEPLOY.md) if configured).
 
 ## Features
 
@@ -62,7 +62,7 @@ npm run dev
 
 ## Repo
 
-**[GitHub – Eddiebm/LeasingApp](https://github.com/Eddiebm/LeasingApp)**
+**[GitHub – RentLease.App](https://github.com/Eddiebm/LeasingApp)**
 
 ## PWA
 
@@ -137,4 +137,4 @@ Screening is mocked in `lib/runScreening.ts`. To use **Checkr** or **RentPrep**:
 
 ## License
 
-Private – Bannerman Group.
+Private – RentLease.

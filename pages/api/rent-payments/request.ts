@@ -104,7 +104,7 @@ export default async function handler(req: Request) {
 
   const paymentId = (paymentRow as { id: string }).id;
   const env = getEnv();
-  const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/$/, "") || "https://leasingapp.pages.dev";
+  const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/$/, "") || "https://rentlease.app";
   const paymentUrl = `${origin}/pay/${paymentId}`;
 
   const amountFormatted = new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(totalCents / 100);

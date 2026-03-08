@@ -63,7 +63,7 @@ export default async function handler(req: Request) {
 
   const origin =
     (req.headers.get("origin") || req.headers.get("referer") || "").replace(/\/$/, "") ||
-    "https://leasingapp.pages.dev";
+    "https://rentlease.app";
 
   const sessionRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",

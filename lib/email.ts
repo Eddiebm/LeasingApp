@@ -8,7 +8,7 @@ function getResend(opts?: EmailOptions): Resend | null {
 }
 
 function getFrom(opts?: EmailOptions): string {
-  return opts?.from ?? process.env.EMAIL_FROM ?? "Bannerman Leasing <onboarding@resend.dev>";
+  return opts?.from ?? process.env.EMAIL_FROM ?? "RentLease <onboarding@resend.dev>";
 }
 
 export async function sendNewApplicationEmail(
@@ -358,10 +358,10 @@ export async function sendConnectOnboardingCompleteEmail(
     const { error } = await resend.emails.send({
       from: getFrom(opts),
       to: [landlordEmail],
-      subject: "Bank account connected — Bannerman Leasing",
+      subject: "Bank account connected — RentLease",
       html: `
         <p>Hi ${landlordName},</p>
-        <p>Your bank account is now connected. You can start collecting rent through Bannerman Leasing.</p>
+        <p>Your bank account is now connected. You can start collecting rent through RentLease.</p>
       `
     });
     return !error;
@@ -371,7 +371,7 @@ export async function sendConnectOnboardingCompleteEmail(
 }
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const from = process.env.EMAIL_FROM ?? "Bannerman Leasing <onboarding@resend.dev>";
+const from = process.env.EMAIL_FROM ?? "RentLease <onboarding@resend.dev>";
 
 export async function sendApplicationReceived(to: string, applicationId: string): Promise<boolean> {
   if (!resend) return false;
@@ -379,7 +379,7 @@ export async function sendApplicationReceived(to: string, applicationId: string)
     const { error } = await resend.emails.send({
       from,
       to: [to],
-      subject: "Application received – Bannerman Leasing",
+      subject: "Application received – RentLease",
       html: `
         <p>We've received your rental application.</p>
         <p>Application ID: <strong>${applicationId}</strong>. Keep this for your records.</p>
@@ -404,7 +404,7 @@ export async function sendMaintenanceReceived(to: string, requestId: string): Pr
     const { error } = await resend.emails.send({
       from,
       to: [to],
-      subject: "Maintenance request received – Bannerman Leasing",
+      subject: "Maintenance request received – RentLease",
       html: `
         <p>We've received your maintenance request.</p>
         <p>Request ID: <strong>${requestId}</strong></p>

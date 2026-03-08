@@ -1,6 +1,6 @@
 # End-to-End Test Checklist
 
-Use this checklist to verify core flows on leasingapp.pages.dev (or local/staging). Run through in order where flows depend on previous steps.
+Use this checklist to verify core flows on rentlease.app (or local/staging). Run through in order where flows depend on previous steps.
 
 ---
 

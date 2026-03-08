@@ -99,7 +99,7 @@ export default async function handler(req: Request) {
     const daysLate = Math.max(0, Math.ceil((Date.now() - dueDate.getTime()) / (24 * 60 * 60 * 1000)));
     const amountFormatted = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((amountCents + lateFeeCents) / 100);
     const lateFeeFormatted = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(lateFeeCents / 100);
-    const origin = env.NEXT_PUBLIC_APP_URL ?? "https://leasingapp.pages.dev";
+    const origin = env.NEXT_PUBLIC_APP_URL ?? "https://rentlease.app";
     const paymentUrl = `${origin}/pay/${rentPaymentId ?? ""}`;
 
     if (rentPaymentId) {

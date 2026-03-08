@@ -168,7 +168,7 @@ export default async function handler(req: Request) {
   const appId = (appRow as { id: string }).id;
   const env = getEnv();
   const tenantName = `${String(data.firstName).trim()} ${String(data.lastName).trim()}`;
-  const origin = req.headers.get?.("origin") || req.headers.get?.("referer")?.replace(/\/$/, "") || "https://leasingapp.pages.dev";
+  const origin = req.headers.get?.("origin") || req.headers.get?.("referer")?.replace(/\/$/, "") || "https://rentlease.app";
   const dashboardLink = `${origin}/dashboard`;
 
   let propertyAddress = "—";
@@ -189,7 +189,7 @@ export default async function handler(req: Request) {
     }).catch(console.error);
   }
   if (env.RESEND_API_KEY && data.email) {
-    const origin = req.headers.get?.("origin") || req.headers.get?.("referer")?.replace(/\/$/, "") || "https://leasingapp.pages.dev";
+    const origin = req.headers.get?.("origin") || req.headers.get?.("referer")?.replace(/\/$/, "") || "https://rentlease.app";
     const portalLink = `${origin}/portal?id=${encodeURIComponent(appId)}&email=${encodeURIComponent(String(data.email).trim())}`;
     const resendTenant = new Resend(env.RESEND_API_KEY);
     resendTenant.emails

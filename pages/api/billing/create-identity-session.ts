@@ -37,7 +37,7 @@ export default async function handler(req: Request) {
     "metadata[landlord_id]": landlordId ?? "",
     "metadata[email]": landlordEmail ?? "",
     "options[document][require_matching_selfie]": "true",
-    "return_url": "https://leasingapp.pages.dev/dashboard/billing?verified=1",
+    "return_url": "https://rentlease.app/dashboard/billing?verified=1",
   });
 
   const res = await fetch("https://api.stripe.com/v1/identity/verification_sessions", {

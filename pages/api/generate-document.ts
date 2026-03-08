@@ -25,7 +25,7 @@ export default async function handler(req: Request) {
     rent: Number(data.rent) || 0,
     deposit: Number(data.deposit) || 0,
     moveIn: (data.moveIn as string) ?? "",
-    landlord: (data.landlord as string) ?? "Eddie Bannerman-Menson"
+    landlord: (data.landlord as string) ?? "Eddie RentLease-Menson"
   });
 
   const applicationId = data.applicationId as string | undefined;

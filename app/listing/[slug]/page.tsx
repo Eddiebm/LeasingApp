@@ -43,7 +43,7 @@ export async function generateMetadata({ params }: PageParams) {
   const property = await fetchProperty(params.slug);
   if (!property || property.is_listed === false) {
     return {
-      title: "Listing not found — Bannerman Leasing",
+      title: "Listing not found — RentLease",
       description: "This rental listing is no longer active.",
     };
   }
@@ -51,18 +51,18 @@ export async function generateMetadata({ params }: PageParams) {
   const title = property.listing_headline || property.address || "Rental listing";
   const description = `${property.bedrooms ?? ""}bd/${property.bathrooms ?? ""}ba · $${property.rent ?? ""}/mo · ${property.address ?? ""}`;
 
-  const BASE = "https://leasingapp.pages.dev";
+  const BASE = "https://rentlease.app";
   const socialCardUrl = `${BASE}/api/properties/${property.id}/social-card`;
 
   return {
-    title: `${title} — Bannerman Leasing`,
+    title: `${title} — RentLease`,
     description,
     openGraph: {
       title,
       description,
       images: [{ url: socialCardUrl, width: 1080, height: 1080, alt: title }],
       type: "website",
-      siteName: "Bannerman Leasing",
+      siteName: "RentLease",
     },
     twitter: {
       card: "summary_large_image",
@@ -150,7 +150,7 @@ export default async function ListingPage({ params }: PageParams) {
           Apply Now
         </Link>
         <ListingShareRow
-          listingUrl={`https://leasingapp.pages.dev/listing/${params.slug}`}
+          listingUrl={`https://rentlease.app/listing/${params.slug}`}
           headline={property.listing_headline || addressLine || "Rental listing"}
           price={price}
           bedsBaths={bedsBaths}
@@ -159,7 +159,7 @@ export default async function ListingPage({ params }: PageParams) {
         />
       </div>
       {/* Fallback image hint for scrapers that don't read OG tags */}
-      <link rel="image_src" href={`https://leasingapp.pages.dev/api/properties/${property.id}/social-card`} />
+      <link rel="image_src" href={`https://rentlease.app/api/properties/${property.id}/social-card`} />
     </main>
   );
 }

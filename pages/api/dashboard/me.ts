@@ -4,7 +4,7 @@ import { DEFAULT_COUNTRY } from "../../../lib/subscription";
 export const runtime = "edge";
 
 const ADMIN_USER_ID = "4c447225-b57c-4da1-83ff-94cc25ad6755";
-const ADMIN_EMAIL = "eddie@bannermanmenson.com";
+const ADMIN_EMAIL = "eddie@rentleasemenson.com";
 
 function getUserIdFromBearerToken(req: Request): string | null {
   const authHeader = req.headers.get("authorization") ?? "";

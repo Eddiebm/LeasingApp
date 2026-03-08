@@ -45,7 +45,7 @@ type Props = { params: { id: string } };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const property = await fetchRental(params.id);
   if (!property) {
-    return { title: "Listing not found — Bannerman Leasing", description: "This rental listing is no longer active." };
+    return { title: "Listing not found — RentLease", description: "This rental listing is no longer active." };
   }
   const addressLine = [property.address, property.city, property.state, property.zip].filter(Boolean).join(", ");
   const title = addressLine || "Rental listing";
@@ -55,16 +55,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const ogImage =
     Array.isArray(property.photos) && property.photos[0]
       ? property.photos[0]
-      : `https://leasingapp.pages.dev/api/properties/${property.id}/social-card`;
+      : `https://rentlease.app/api/properties/${property.id}/social-card`;
   return {
-    title: `${title} — Bannerman Leasing`,
+    title: `${title} — RentLease`,
     description,
     openGraph: {
       title,
       description,
       images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
       type: "website",
-      siteName: "Bannerman Leasing",
+      siteName: "RentLease",
     },
     twitter: { card: "summary_large_image", title, description, images: [ogImage] },
   };

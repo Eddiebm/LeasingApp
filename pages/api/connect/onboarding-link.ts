@@ -47,7 +47,7 @@ export default async function handler(req: Request) {
   const stripeKey = env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) return json({ error: "Stripe not configured" }, 503);
 
-  const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/$/, "") || "https://leasingapp.pages.dev";
+  const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/$/, "") || "https://rentlease.app";
   const refreshUrl = `${origin}/dashboard/billing?connect=refresh`;
   const returnUrl = `${origin}/dashboard/billing?connect=success`;
 

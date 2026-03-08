@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export const metadata = {
   title: "Privacy",
-  description: "Privacy and data retention for Bannerman Leasing."
+  description: "Privacy and data retention for RentLease."
 };
 
 export default function PrivacyPage() {

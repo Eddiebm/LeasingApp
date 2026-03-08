@@ -93,7 +93,7 @@ export default async function handler(req: Request) {
       const resend = new Resend(resendKey);
       const tenantName = tenant ? `${tenant.first_name} ${tenant.last_name}`.trim() : "Applicant";
       const from = env.EMAIL_FROM ?? "Leasing <onboarding@resend.dev>";
-      const origin = req.headers.get?.("origin") || req.headers.get?.("referer")?.replace(/\/$/, "") || "https://leasingapp.pages.dev";
+      const origin = req.headers.get?.("origin") || req.headers.get?.("referer")?.replace(/\/$/, "") || "https://rentlease.app";
       if (status === "approved") {
         const signLink = `${origin}/sign-lease?token=${encodeURIComponent(id)}`;
         resend.emails

@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export const metadata = {
   title: "Terms of Service",
-  description: "Terms of use for Bannerman Leasing."
+  description: "Terms of use for RentLease."
 };
 
 export default function TermsPage() {

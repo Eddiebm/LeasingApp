@@ -117,7 +117,7 @@ export default async function handler(req: Request) {
 
   const propertyAddress = `${property.address}, ${property.city}, ${property.state} ${property.zip}`;
   const env = getEnv();
-  const origin = req.headers.get?.("origin") || req.headers.get?.("referer")?.replace(/\/$/, "") || "https://leasingapp.pages.dev";
+  const origin = req.headers.get?.("origin") || req.headers.get?.("referer")?.replace(/\/$/, "") || "https://rentlease.app";
   const signingUrl = `${origin}/sign-lease?token=${encodeURIComponent(signingToken)}`;
 
   sendLeaseForSigningEmail(tenantEmail, tenantName, propertyAddress, signingUrl, {

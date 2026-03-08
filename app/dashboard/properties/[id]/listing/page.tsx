@@ -23,7 +23,7 @@ type ListingData = {
   listing_slug: string | null;
 };
 
-const BASE_URL = "https://leasingapp.pages.dev";
+const BASE_URL = "https://rentlease.app";
 
 function getAuthHeaders(): Record<string, string> {
   const token = typeof window !== "undefined"

@@ -28,4 +28,4 @@ In **Cloudflare** → your Pages project → **Settings** → **Functions** → 
 
 ---
 
-**Live URL:** `https://leasingapp.pages.dev` (or your custom domain if you added one).
+**Live URL:** `https://rentlease.app` (or your custom domain if you added one).

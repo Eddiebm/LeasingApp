@@ -9,7 +9,7 @@ function getResetRedirect(): string {
   if (typeof window !== "undefined" && window.location?.origin) {
     return `${window.location.origin}/dashboard/reset-password`;
   }
-  return "https://leasingapp.pages.dev/dashboard/reset-password";
+  return "https://rentlease.app/dashboard/reset-password";
 }
 
 export default function ForgotPasswordPage() {

@@ -56,7 +56,7 @@ export default async function handler(req: Request) {
 
   const origin =
     (req.headers.get("origin") || req.headers.get("referer") || "").replace(/\/$/, "") ||
-    "https://leasingapp.pages.dev";
+    "https://rentlease.app";
   const token = row.token as string;
   const successUrl = `${origin}/documents?paid=1&token=${encodeURIComponent(token)}`;
   const cancelUrl = `${origin}/documents?token=${encodeURIComponent(token)}`;

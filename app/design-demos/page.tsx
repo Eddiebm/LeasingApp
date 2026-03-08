@@ -25,8 +25,8 @@ export default function DesignDemosPage() {
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-slate-400">1. Current — Minimal slate</h2>
           <div className="space-y-4">
             <div>
-              <h3 className="text-2xl font-bold text-slate-900">Bannerman Leasing</h3>
-              <p className="text-sm text-slate-600">Simple tenant applications, screenings, and leases for The Bannerman Group.</p>
+              <h3 className="text-2xl font-bold text-slate-900">RentLease</h3>
+              <p className="text-sm text-slate-600">Simple tenant applications, screenings, and leases for RentLease.</p>
             </div>
             <div className="grid gap-3">
               <div className="rounded-xl bg-slate-900 px-4 py-4 text-center text-white shadow-md">
@@ -45,8 +45,8 @@ export default function DesignDemosPage() {
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-amber-800/70">2. Warm — Stone + amber</h2>
           <div className="space-y-4">
             <div>
-              <h3 className="font-serif text-2xl font-semibold text-stone-800">Bannerman Leasing</h3>
-              <p className="text-sm text-stone-600">Simple tenant applications, screenings, and leases for The Bannerman Group.</p>
+              <h3 className="font-serif text-2xl font-semibold text-stone-800">RentLease</h3>
+              <p className="text-sm text-stone-600">Simple tenant applications, screenings, and leases for RentLease.</p>
             </div>
             <div className="grid gap-3">
               <div className="rounded-2xl bg-amber-700 px-4 py-4 text-center text-amber-50 shadow-md">
@@ -65,8 +65,8 @@ export default function DesignDemosPage() {
           <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-slate-500">3. Bold — Emerald accent</h2>
           <div className="space-y-4">
             <div>
-              <h3 className="text-3xl font-bold tracking-tight text-slate-900">Bannerman Leasing</h3>
-              <p className="mt-1 text-sm font-medium text-slate-600">Simple tenant applications, screenings, and leases for The Bannerman Group.</p>
+              <h3 className="text-3xl font-bold tracking-tight text-slate-900">RentLease</h3>
+              <p className="mt-1 text-sm font-medium text-slate-600">Simple tenant applications, screenings, and leases for RentLease.</p>
             </div>
             <div className="grid gap-3">
               <div className="rounded-xl bg-emerald-600 px-4 py-4 text-center font-semibold text-white shadow-lg shadow-emerald-900/20">
@@ -85,8 +85,8 @@ export default function DesignDemosPage() {
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-indigo-600/80">4. Soft — Rounded & friendly</h2>
           <div className="space-y-4">
             <div>
-              <h3 className="text-2xl font-bold text-slate-800">Bannerman Leasing</h3>
-              <p className="text-sm text-slate-600">Simple tenant applications, screenings, and leases for The Bannerman Group.</p>
+              <h3 className="text-2xl font-bold text-slate-800">RentLease</h3>
+              <p className="text-sm text-slate-600">Simple tenant applications, screenings, and leases for RentLease.</p>
             </div>
             <div className="grid gap-3">
               <div className="rounded-2xl bg-indigo-500 px-4 py-4 text-center font-medium text-white shadow-md">
@@ -105,8 +105,8 @@ export default function DesignDemosPage() {
           <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-amber-400/90">5. Pro — Navy & gold</h2>
           <div className="space-y-4">
             <div>
-              <h3 className="text-2xl font-bold text-white">Bannerman Leasing</h3>
-              <p className="text-sm text-slate-300">Simple tenant applications, screenings, and leases for The Bannerman Group.</p>
+              <h3 className="text-2xl font-bold text-white">RentLease</h3>
+              <p className="text-sm text-slate-300">Simple tenant applications, screenings, and leases for RentLease.</p>
             </div>
             <div className="grid gap-3">
               <div className="rounded-xl border-2 border-amber-400 bg-amber-500 px-4 py-4 text-center font-semibold text-slate-900">
@@ -125,8 +125,8 @@ export default function DesignDemosPage() {
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-slate-400">6. Editorial — Serif & space</h2>
           <div className="space-y-6">
             <div className="border-b border-slate-100 pb-6">
-              <h3 className="font-serif text-3xl font-normal text-slate-900">Bannerman Leasing</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">Simple tenant applications, screenings, and leases for The Bannerman Group.</p>
+              <h3 className="font-serif text-3xl font-normal text-slate-900">RentLease</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">Simple tenant applications, screenings, and leases for RentLease.</p>
             </div>
             <div className="grid gap-2">
               <div className="rounded-lg bg-slate-900 py-3.5 pl-5 pr-4 text-left font-medium text-white">

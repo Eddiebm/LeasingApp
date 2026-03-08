@@ -257,7 +257,7 @@ export default function BillingPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Rent collection</h2>
         <p className="mt-1 text-sm text-slate-600">
-          To collect rent through Bannerman Leasing, connect your bank account via Stripe.
+          To collect rent through RentLease, connect your bank account via Stripe.
         </p>
         {(connectStatus?.onboarded || landlord?.stripe_connect_onboarded) ? (
           <div className="mt-4 space-y-2">
@@ -323,7 +323,7 @@ export default function BillingPage() {
             ) : (
               <div className="space-y-4">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                  <h2 className="text-base font-semibold text-slate-900">Upgrade to Bannerman Leasing Pro</h2>
+                  <h2 className="text-base font-semibold text-slate-900">Upgrade to RentLease Pro</h2>
                   {country === "US" ? (
                     <p className="mt-2 text-sm text-slate-700">
                       One AI-generated lease saves you $150–$500 in attorney fees. Pro costs $24.99/month.

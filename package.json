@@ -1,18 +1,18 @@
 {
-  "name": "leasing-app",
+  "name": "rentlease",
   "version": "1.0.0",
-  "description": "Rental agency app: tenant applications, document uploads, screening, and lease generation for Bannerman Group",
+  "description": "Rental agency app: tenant applications, document uploads, screening, and lease generation for RentLease",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "build:cloudflare": "next build && npx @cloudflare/next-on-pages",
-    "deploy": "npm run build:cloudflare && npx wrangler pages deploy --project-name=leasingapp",
+    "deploy": "npm run build:cloudflare && npx wrangler pages deploy --project-name=rentlease",
     "start": "next start",
     "preview": "npx wrangler pages dev .vercel/output/static --compatibility-flags=nodejs_compat",
     "lint": "next lint",
     "db:migrate": "node database/run-migrations.js",
-    "score": "npx lighthouse https://leasingapp.pages.dev --output=html --output-path=./lighthouse-report.html --view --chrome-flags='--headless'"
+    "score": "npx lighthouse https://rentlease.app --output=html --output-path=./lighthouse-report.html --view --chrome-flags='--headless'"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

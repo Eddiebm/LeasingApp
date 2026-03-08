@@ -4,8 +4,8 @@ import PwaRegister from "../components/PwaRegister";
 import OfflineBanner from "../components/OfflineBanner";
 
 export const metadata = {
-  title: "Bannerman Leasing",
-  description: "Tenant applications and leasing dashboard for The Bannerman Group",
+  title: "RentLease",
+  description: "Tenant applications, screening, and leasing dashboard — RentLease.App",
   manifest: "/manifest.json"
 };
 
